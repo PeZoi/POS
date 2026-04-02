@@ -46,6 +46,8 @@ export function Modal({
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
 
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
+
   if (!open || !mounted) return null
 
   return createPortal(
@@ -53,13 +55,24 @@ export function Modal({
       className="fixed inset-0 z-50"
       role="dialog"
       aria-modal="true"
+      onPointerDown={(e) => {
+        const content = contentRef.current
+        if (!content) return
+        const target = e.target as Node | null
+        if (target && !content.contains(target)) onOpenChange(false)
+      }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onOpenChange(false)
+        // Fallback for older browsers/devices that might not fire pointer events as expected.
+        const content = contentRef.current
+        if (!content) return
+        const target = e.target as Node | null
+        if (target && !content.contains(target)) onOpenChange(false)
       }}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div className="absolute inset-0 grid place-items-end sm:place-items-center p-0 sm:p-6">
         <div
+          ref={contentRef}
           className={cn(
             'w-full bg-background text-foreground shadow-xl border rounded-t-2xl sm:rounded-2xl',
             'max-h-[85vh] overflow-auto',

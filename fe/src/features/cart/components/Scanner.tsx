@@ -274,9 +274,15 @@ export default function Scanner({
       }
     }
 
-    run()
+    // Khi vừa chuyển mode (Scanbot -> html5), iOS/Safari đôi khi cần vài trăm ms để
+    // "nhả" camera sau khi stream trước bị dispose. Delay giúp tránh abort.
+    const START_DELAY_MS = 650
+    const startTimer = setTimeout(() => {
+      void run()
+    }, START_DELAY_MS)
 
     return () => {
+      clearTimeout(startTimer)
       cancelled = true
       root?.classList.remove('scanner-full')
       setTorchSupported(false)

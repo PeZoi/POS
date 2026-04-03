@@ -31,6 +31,14 @@ export default function CartPayment() {
     setScannerMode('html5')
   }, [])
 
+  // Khi vừa chuyển sang chế độ Camera nhanh, cần dừng stream camera cũ ngay (trước khi Scanner mount/start),
+  // tránh html5-qrcode bị "AbortError" do race giữa dispose/unmount.
+  React.useLayoutEffect(() => {
+    if (scannerMode === 'html5') {
+      stopAllVideoStreamsUnderRoot()
+    }
+  }, [scannerMode])
+
   /** Chạy trước useEffect cleanup của Scanner → dừng camera ngay khi thoát /cart. */
   React.useLayoutEffect(() => {
     return () => {

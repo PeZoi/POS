@@ -1,4 +1,4 @@
-import beepMp3Url from '@/assets/beep.mp3'
+import beepMp3Url from '@/assets/beep.wav'
 
 let audioEl: HTMLAudioElement | null = null
 

@@ -1,6 +1,13 @@
+import {
+  DEFAULT_SCANNER_SETTINGS,
+  html5FormatsFromConfig,
+  type ScannerSettings,
+} from '@/features/cart/scanner-config'
+import { stopAllVideoElementStreams } from '@/lib/camera-stream'
+import { playBeep, unlockAudio } from '@/lib/sound-beep'
+import { Html5Qrcode } from 'html5-qrcode'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
 const READER_ID = 'qr-reader'
 
@@ -9,49 +16,6 @@ const MIN_BOX = 50
 
 /** Decode nhanh (mặc định) — FPS cao hơn, ít định dạng hơn để nhẹ CPU. */
 const SCAN_FPS_FAST = 22
-
-/** Sau mỗi lần đọc mã thành công: chờ trước khi cho quét tiếp (tránh trùng lặp). */
-const COOLDOWN_MS = 1000
-
-let scanSuccessAudioCtx: AudioContext | null = null
-
-function playScanSuccessTing(): void {
-  if (typeof window === 'undefined') return
-  try {
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext
-    if (!AC) return
-    if (!scanSuccessAudioCtx || scanSuccessAudioCtx.state === 'closed') {
-      scanSuccessAudioCtx = new AC()
-    }
-    const ctx = scanSuccessAudioCtx
-    void ctx.resume()
-    const t0 = ctx.currentTime
-
-    const playBeep = (freq: number, start: number, durationSec: number) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'square'
-      osc.frequency.setValueAtTime(freq, start)
-
-      gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + durationSec)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(start)
-      osc.stop(start + durationSec + 0.03)
-    }
-
-    playBeep(1500, t0 + 0.0, 0.055)
-    playBeep(2000, t0 + 0.085, 0.065)
-  } catch {
-    /* ignore */
-  }
-}
 
 /** Độ phân giải ưu tiên: barcode rõ nét hơn (camera sẽ tự giảm nếu không hỗ trợ). */
 const VIDEO_IDEAL = {
@@ -119,15 +83,6 @@ async function enableAutoZoom(scanner: Html5Qrcode): Promise<void> {
   }
 }
 
-/** Chỉ barcode POS phổ biến — decoder nhẹ nhất. */
-const BARCODE_ONLY: Html5QrcodeSupportedFormats[] = [
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-]
-
 function qrboxHorizontal(
   viewfinderWidth: number,
   viewfinderHeight: number,
@@ -144,7 +99,13 @@ function qrboxHorizontal(
 
 
 
-export default function Scanner({ onScan }: { onScan: (item: string) => void }) {
+export default function Scanner({
+  onScan,
+  settings = DEFAULT_SCANNER_SETTINGS,
+}: {
+  onScan: (item: string) => void
+  settings?: ScannerSettings
+}) {
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(true)
   const [torchSupported, setTorchSupported] = useState(false)
@@ -169,13 +130,18 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
     let cancelled = false
     const scanner = new Html5Qrcode(READER_ID, {
       verbose: false,
-      formatsToSupport: BARCODE_ONLY,
+      formatsToSupport: html5FormatsFromConfig(settings.barcodeFormats),
       useBarCodeDetectorIfSupported: true,
     })
     scannerRef.current = scanner
 
     let gateOpen = true
     let cooldownTimer: ReturnType<typeof setTimeout> | null = null
+
+    const hardStopPreviewTracks = () => {
+      const host = document.getElementById(READER_ID)
+      if (host) stopAllVideoElementStreams(host)
+    }
 
     const safeShutdown = () => {
       if (cooldownTimer !== null) {
@@ -185,7 +151,7 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
       gateOpen = true
       try {
         if (scanner.isScanning) {
-          scanner
+          void scanner
             .stop()
             .then(() => {
               try {
@@ -193,14 +159,18 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
               } catch {
                 /* ignore */
               }
+              hardStopPreviewTracks()
             })
-            .catch(() => {})
+            .catch(() => {
+              hardStopPreviewTracks()
+            })
         } else {
           try {
             scanner.clear()
           } catch {
             /* ignore */
           }
+          hardStopPreviewTracks()
         }
       } catch {
         try {
@@ -208,6 +178,7 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
         } catch {
           /* ignore */
         }
+        hardStopPreviewTracks()
       }
     }
 
@@ -232,7 +203,7 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
             if (cancelled || !gateOpen) return
             gateOpen = false
             onScanRef.current(decodedText)
-            playScanSuccessTing()
+            playBeep()
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
               navigator.vibrate(25)
             }
@@ -254,7 +225,7 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
                 /* ignore */
               }
               gateOpen = true
-            }, COOLDOWN_MS)
+            }, settings.scanCooldownMs)
           },
           () => {},
         )
@@ -313,7 +284,7 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
       scannerRef.current = null
       safeShutdown()
     }
-  }, [effectiveFps])
+  }, [effectiveFps, settings])
 
   const toggleTorch = useCallback(() => {
     const scanner = scannerRef.current
@@ -343,6 +314,17 @@ export default function Scanner({ onScan }: { onScan: (item: string) => void }) 
         <p className="max-w-[56ch] text-sm leading-snug text-muted-foreground">
           Decode nhanh · {effectiveFps} FPS · EAN/UPC/Code128
         </p>
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => {
+              void unlockAudio().then(() => playBeep())
+            }}
+            className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Bật âm / Test beep
+          </button>
+        </div>
       </header>
 
       <div

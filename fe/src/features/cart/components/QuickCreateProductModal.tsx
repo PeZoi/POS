@@ -8,6 +8,7 @@ import type { CreateProductInput } from '@/types/pos'
 
 type QuickCreateProductModalProps = {
   open: boolean
+  /** Có sẵn từ quét; null = thêm thủ công — không có barcode, hệ thống tạo mã nội bộ. */
   barcode: string | null
   initialError: string | null
   onOpenChange: (open: boolean) => void
@@ -58,7 +59,6 @@ export function QuickCreateProductModal({
   }, [open])
 
   const confirmCreate = async () => {
-    if (!barcode) return
     setError(null)
 
     if (!Number.isInteger(parsedPrice) || parsedPrice <= 0) {
@@ -67,15 +67,20 @@ export function QuickCreateProductModal({
       return
     }
 
+    const resolvedBarcode =
+      barcode != null && barcode.length > 0
+        ? barcode
+        : `MANUAL-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
     const name =
       draftName.trim().length > 0
         ? draftName.trim()
-        : `SP ${barcode.slice(-6) || barcode}`
+        : `SP ${resolvedBarcode.slice(-6)}`
 
     try {
       const payload: CreateProductInput = {
         name,
-        barcode,
+        barcode: resolvedBarcode,
         price: parsedPrice,
         status: 'ACTIVE',
         isAutoCreated: true,
@@ -91,13 +96,16 @@ export function QuickCreateProductModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Chưa có sản phẩm — tạo nhanh"
+      title={barcode ? 'Chưa có sản phẩm — tạo nhanh' : 'Thêm sản phẩm nhanh'}
       description={
         barcode ? (
           <span>
             Barcode: <span className="font-mono">{barcode}</span>
           </span>
-        ) : null
+        ) : (
+          <>
+          </>
+        )
       }
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

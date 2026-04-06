@@ -127,6 +127,13 @@
   html {
     @apply font-sans;
     }
+
+  /* iOS Safari: không tự zoom khi focus nếu font ô nhập ≥ 16px (xem Input + các control gốc) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
 }
 
 /* Toast giỏ hàng (CartPayment) — animation mount/unmount */

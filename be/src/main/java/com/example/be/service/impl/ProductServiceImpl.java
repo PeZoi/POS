@@ -10,6 +10,7 @@ import com.example.be.mapper.ProductMapper;
 import com.example.be.repository.ProductRepository;
 import com.example.be.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,27 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findAll()
                 .stream()
                 .sorted(Comparator.comparing(ProductEntity::getId).reversed())
+                .map(ProductMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public List<ProductResponse> search(String q, int limit) {
+        if (q == null) {
+            return List.of();
+        }
+        String trimmed = q.trim();
+        if (trimmed.isEmpty()) {
+            return List.of();
+        }
+        // Tránh ký tự đặc biệt của LIKE (%, _)
+        String safe = trimmed.replace("%", "").replace("_", "");
+        if (safe.isEmpty()) {
+            return List.of();
+        }
+        int cap = Math.min(Math.max(limit, 1), 50);
+        return productRepository.searchByNameOrBarcode(safe, PageRequest.of(0, cap))
+                .stream()
                 .map(ProductMapper::toResponse)
                 .toList();
     }

@@ -9,6 +9,11 @@ import java.util.List;
 public interface ProductService {
     List<ProductResponse> list();
 
+    /**
+     * Tìm theo tên hoặc barcode (LIKE, không phân biệt hoa thường), tối đa {@code limit} bản ghi.
+     */
+    List<ProductResponse> search(String q, int limit);
+
     ProductResponse getById(Long id);
 
     ProductResponse getByBarcode(String barcode);

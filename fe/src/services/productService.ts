@@ -5,6 +5,13 @@ export const productService = {
   list(): Promise<Product[]> {
     return apiRequest<Product[]>('/api/products')
   },
+  /** Tìm theo tên hoặc barcode (server), mặc định tối đa 5 kết quả. */
+  search(q: string, limit = 5): Promise<Product[]> {
+    const params = new URLSearchParams()
+    params.set('q', q.trim())
+    params.set('limit', String(limit))
+    return apiRequest<Product[]>(`/api/products/search?${params.toString()}`)
+  },
   getById(id: number): Promise<Product> {
     return apiRequest<Product>(`/api/products/${id}`)
   },

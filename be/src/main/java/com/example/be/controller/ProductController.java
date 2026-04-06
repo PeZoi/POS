@@ -30,6 +30,15 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.list()));
     }
 
+    @GetMapping("/search")
+    @Operation(summary = "Search products", description = "Search by name or barcode (case-insensitive, partial match).")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> search(
+            @RequestParam(value = "q", required = false, defaultValue = "") String q,
+            @RequestParam(value = "limit", required = false, defaultValue = "5") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(productService.search(q, limit)));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get product by id")
     public ResponseEntity<ApiResponse<ProductResponse>> get(@PathVariable Long id) {

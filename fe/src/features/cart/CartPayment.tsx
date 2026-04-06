@@ -4,6 +4,7 @@ import { cartGrandTotal } from '@/features/cart/cart-lines'
 import Scanner from '@/features/cart/components/Scanner'
 import PyBarcodeScanner from '@/features/cart/components/PyBarcodeScanner'
 import { useScannerSettings } from '@/features/cart/scanner-config'
+import { CartProductSearch } from '@/features/cart/components/CartProductSearch'
 import { CartScanList } from '@/features/cart/components/CartScanList'
 import { ScannerModeMenu } from '@/features/cart/components/ScannerModeMenu'
 import type { ScannerModeId } from '@/features/cart/scanner-mode'
@@ -117,7 +118,7 @@ export default function CartPayment() {
     scanProcessingResolveRef.current = null
   }, [])
 
-  const openCreatePopup = React.useCallback((barcode: string, initialError?: string) => {
+  const openCreatePopup = React.useCallback((barcode: string | null, initialError?: string) => {
     setPendingBarcode(barcode)
     setScanError(initialError ?? null)
     setCreateOpen(true)
@@ -128,13 +129,24 @@ export default function CartPayment() {
     })
   }, [])
 
+  const addProductToCart = React.useCallback(
+    (product: Product) => {
+      setScannedProducts((prev) => {
+        const already = prev.some((p) => p.id === product.id)
+        if (already) return [...prev, { ...product }]
+        return [product, ...prev]
+      })
+      showAddedToCartToast(product.name)
+    },
+    [showAddedToCartToast],
+  )
+
   const onCreateProduct = React.useCallback(
     async (payload: CreateProductInput) => {
       const created = await productService.create(payload)
-      setScannedProducts((prev) => [created, ...prev])
-      showAddedToCartToast(created.name)
+      addProductToCart(created)
     },
-    [showAddedToCartToast],
+    [addProductToCart],
   )
 
   const handleModalOpenChange = React.useCallback(
@@ -155,13 +167,7 @@ export default function CartPayment() {
 
       try {
         const existing = await productService.getByBarcode(code)
-        setScannedProducts((prev) => {
-          const already = prev.some((p) => p.id === existing.id)
-          // Trùng mã: chỉ tăng SL, giữ thứ tự dòng (first-occurrence trong cart-lines).
-          if (already) return [...prev, { ...existing }]
-          return [existing, ...prev]
-        })
-        showAddedToCartToast(existing.name)
+        addProductToCart(existing)
 
         // Ensure UI paint before allowing scanner to continue.
         await new Promise<void>((r) => window.requestAnimationFrame(() => r()))
@@ -174,7 +180,7 @@ export default function CartPayment() {
         await openCreatePopup(code, msg)
       }
     },
-    [openCreatePopup, scanningLocked, showAddedToCartToast],
+    [addProductToCart, openCreatePopup, scanningLocked],
   )
 
   return (
@@ -224,6 +230,11 @@ export default function CartPayment() {
       <div className="flex flex-1 flex-col overflow-auto pb-[calc(5.75rem+env(safe-area-inset-bottom))]">
         <div className="grid flex-1 gap-2 px-0 md:grid-cols-[1fr_420px] md:items-start md:gap-3 md:px-0">
       <div className="flex min-w-0 flex-col gap-2">
+        <CartProductSearch
+          onPickProduct={addProductToCart}
+          onQuickAdd={() => void openCreatePopup(null)}
+          formatVnd={formatVnd}
+        />
         {scannerMode === 'html5' ? (
           <Scanner embedded onScan={handleScan} settings={scannerSettings} />
         ) : scannerMode === 'python' ? (

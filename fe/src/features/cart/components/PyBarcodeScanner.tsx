@@ -2,15 +2,18 @@ import { DEFAULT_SCANNER_SETTINGS, type ScannerSettings } from '@/features/cart/
 import { usePyBarcodeScanner } from '@/features/cart/hooks/usePyBarcodeScanner'
 import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
+import * as React from 'react'
 
 export default function PyBarcodeScanner({
   onScan,
   settings = DEFAULT_SCANNER_SETTINGS,
   embedded = false,
+  onError,
 }: {
   onScan: (item: string) => void
   settings?: ScannerSettings
   embedded?: boolean
+  onError?: (message: string) => void
 }) {
   const {
     videoRef,
@@ -24,6 +27,12 @@ export default function PyBarcodeScanner({
     torchOn,
     toggleTorch,
   } = usePyBarcodeScanner(onScan, settings)
+
+  // Bubble error lên parent để fallback mode.
+  React.useEffect(() => {
+    if (!error) return
+    onError?.(error)
+  }, [error, onError])
 
   return (
     <div

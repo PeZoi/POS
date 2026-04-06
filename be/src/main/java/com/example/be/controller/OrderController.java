@@ -35,7 +35,7 @@ public class OrderController {
     }
 
     @PostMapping
-    @Operation(summary = "Create order", description = "Create an order with items. Item price is snapped from product price.")
+    @Operation(summary = "Create order", description = "Create an order with items. Có thể truyền unitPrice theo từng dòng; nếu null sẽ lấy giá hiện tại của sản phẩm.")
     public ResponseEntity<ApiResponse<OrderResponse>> create(@RequestBody @Valid OrderCreateRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.created(orderService.create(request)));
     }

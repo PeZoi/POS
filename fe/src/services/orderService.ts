@@ -4,6 +4,7 @@ import { apiRequest } from '@/services/apiClient'
 export type OrderItemCreate = {
   productId: number
   quantity: number
+  unitPrice?: number
 }
 
 export type CreateOrderInput = {

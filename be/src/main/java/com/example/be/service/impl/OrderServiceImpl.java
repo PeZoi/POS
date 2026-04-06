@@ -87,7 +87,7 @@ public class OrderServiceImpl implements OrderService {
             ProductEntity product = productRepository.findById(it.productId())
                     .orElseThrow(() -> new NotFoundException("Product not found: " + it.productId()));
 
-            int price = product.getPrice();
+            int price = it.unitPrice() != null ? it.unitPrice() : product.getPrice();
             int subtotal = price * it.quantity();
             total += subtotal;
 

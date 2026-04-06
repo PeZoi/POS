@@ -1,6 +1,8 @@
 import * as React from 'react'
 
-import { cartGrandTotal } from '@/features/cart/cart-lines'
+import { Button } from '@/components/ui/button'
+import { useCartStore } from '@/features/cart/cart-store'
+import { cartGrandTotal, cartLinesFromProducts } from '@/features/cart/cart-lines'
 import Scanner from '@/features/cart/components/Scanner'
 import PyBarcodeScanner from '@/features/cart/components/PyBarcodeScanner'
 import { useScannerSettings } from '@/features/cart/scanner-config'
@@ -15,23 +17,30 @@ import { ApiError } from '@/services/apiClient'
 import { stopAllVideoStreamsUnderRoot } from '@/lib/camera-stream'
 import { cn } from '@/lib/utils'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 const ScanbotBarcodeScanner = React.lazy(
   () => import('@/features/cart/components/ScanbotBarcodeScanner'),
 )
 
 export default function CartPayment() {
+  const navigate = useNavigate()
   const scannerSettings = useScannerSettings()
 
-  const [scannedProducts, setScannedProducts] = React.useState<Product[]>([])
+  const [scannerActive, setScannerActive] = React.useState(false)
+
+  const scannedProducts = useCartStore((s) => s.products)
+  const draftPrices = useCartStore((s) => s.draftPrices)
+  const setProducts = useCartStore((s) => s.setProducts)
+  const clearCart = useCartStore((s) => s.clear)
+  const setDraftPrice = useCartStore((s) => s.setDraftPrice)
   const [scanningLocked, setScanningLocked] = React.useState(false)
 
   const [createOpen, setCreateOpen] = React.useState(false)
   const [pendingBarcode, setPendingBarcode] = React.useState<string | null>(null)
   const [scanError, setScanError] = React.useState<string | null>(null)
   const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
-  const [draftPrices, setDraftPrices] = React.useState<Record<number, string>>({})
+  const didFallbackFromPythonRef = React.useRef(false)
   const [cartToastName, setCartToastName] = React.useState<string | null>(null)
   const [cartToastExiting, setCartToastExiting] = React.useState(false)
   const [cartToastNonce, setCartToastNonce] = React.useState(0)
@@ -74,9 +83,53 @@ export default function CartPayment() {
     }
   }, [clearCartToastTimers])
 
+  // iOS Safari/back-forward cache: đảm bảo dừng camera khi rời trang (tránh crash/reload ngẫu nhiên).
+  React.useEffect(() => {
+    const stop = () => stopAllVideoStreamsUnderRoot()
+
+    const onPageHide = () => stop()
+    const onFreeze = () => stop()
+    const onVisibility = () => {
+      // iOS Safari hay crash/reload khi WebRTC stream còn sống trong back/forward cache
+      if (document.visibilityState !== 'visible') stop()
+    }
+    const onPageShow = (e: PageTransitionEvent) => {
+      // Nếu trang được restore từ BFCache, đảm bảo không còn stream cũ.
+      if (e.persisted) stop()
+    }
+
+    window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('freeze', onFreeze as EventListener)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pageshow', onPageShow as EventListener)
+
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('freeze', onFreeze as EventListener)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pageshow', onPageShow as EventListener)
+    }
+  }, [])
+
+  // Giỏ hàng được persist: không tự clear khi vào trang.
+
   const onScanbotInitFailed = React.useCallback(() => {
     setScannerMode('python')
   }, [])
+
+  const onPythonScannerError = React.useCallback(() => {
+    // Tránh loop fallback liên tục khi re-render.
+    if (didFallbackFromPythonRef.current) return
+    didFallbackFromPythonRef.current = true
+    setScannerMode('html5')
+  }, [])
+
+  React.useEffect(() => {
+    // Khi rời python mode (hoặc tắt scanner), reset cờ để lần sau có thể fallback lại.
+    if (scannerMode !== 'python' || !scannerActive) {
+      didFallbackFromPythonRef.current = false
+    }
+  }, [scannerActive, scannerMode])
 
   // Khi vừa chuyển sang chế độ Camera nhanh, cần dừng stream camera cũ ngay (trước khi Scanner mount/start),
   // tránh html5-qrcode bị "AbortError" do race giữa dispose/unmount.
@@ -108,10 +161,14 @@ export default function CartPayment() {
     () => cartGrandTotal(scannedProducts, draftPrices),
     [scannedProducts, draftPrices],
   )
+  const cartLineCount = React.useMemo(
+    () => cartLinesFromProducts(scannedProducts).length,
+    [scannedProducts],
+  )
 
   const onDraftPriceChange = React.useCallback((productId: number, raw: string) => {
-    setDraftPrices((prev) => ({ ...prev, [productId]: raw }))
-  }, [])
+    setDraftPrice(productId, raw)
+  }, [setDraftPrice])
 
   const finishScanProcessing = React.useCallback(() => {
     scanProcessingResolveRef.current?.()
@@ -131,14 +188,14 @@ export default function CartPayment() {
 
   const addProductToCart = React.useCallback(
     (product: Product) => {
-      setScannedProducts((prev) => {
+      setProducts((prev: Product[]) => {
         const already = prev.some((p) => p.id === product.id)
         if (already) return [...prev, { ...product }]
         return [product, ...prev]
       })
       showAddedToCartToast(product.name)
     },
-    [showAddedToCartToast],
+    [setProducts, showAddedToCartToast],
   )
 
   const onCreateProduct = React.useCallback(
@@ -235,25 +292,67 @@ export default function CartPayment() {
           onQuickAdd={() => void openCreatePopup(null)}
           formatVnd={formatVnd}
         />
-        {scannerMode === 'html5' ? (
-          <Scanner embedded onScan={handleScan} settings={scannerSettings} />
-        ) : scannerMode === 'python' ? (
-          <PyBarcodeScanner embedded onScan={handleScan} settings={scannerSettings} />
-        ) : (
-          <React.Suspense
-            fallback={
-              <div className="rounded-2xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground shadow-xs">
-                Đang tải Scanbot…
-              </div>
-            }
+        <div className="flex items-center justify-between gap-2 px-2">
+          <div className="text-sm font-medium text-foreground">Camera quét</div>
+          <Button
+            type="button"
+            variant={scannerActive ? 'outline' : 'default'}
+            size="sm"
+            onClick={() => {
+              if (scannerActive) {
+                setScannerActive(false)
+                stopAllVideoStreamsUnderRoot()
+                return
+              }
+              // iOS Safari: bật lại camera sau back/forward đôi lúc gây reload/crash nếu stream cũ chưa dọn kịp.
+              // Dọn sạch trước, rồi mount scanner ở frame kế tiếp để giảm race.
+              stopAllVideoStreamsUnderRoot()
+              window.requestAnimationFrame(() => setScannerActive(true))
+            }}
           >
-            <ScanbotBarcodeScanner
+            {scannerActive ? 'Tắt camera' : 'Bật camera'}
+          </Button>
+        </div>
+
+        {scannerActive ? (
+          scannerMode === 'html5' ? (
+            <Scanner embedded onScan={handleScan} settings={scannerSettings} />
+          ) : scannerMode === 'python' ? (
+            <PyBarcodeScanner
               embedded
               onScan={handleScan}
-              onInitFailed={onScanbotInitFailed}
               settings={scannerSettings}
+              onError={onPythonScannerError}
             />
-          </React.Suspense>
+          ) : (
+            <React.Suspense
+              fallback={
+                <div className="rounded-2xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground shadow-xs">
+                  Đang tải Scanbot…
+                </div>
+              }
+            >
+              <ScanbotBarcodeScanner
+                embedded
+                onScan={handleScan}
+                onInitFailed={onScanbotInitFailed}
+                settings={scannerSettings}
+              />
+            </React.Suspense>
+          )
+        ) : (
+          <div className="px-4">
+            <button
+              type="button"
+              className={cn(
+                'w-full rounded-2xl border border-dashed bg-card px-4 py-10 text-center text-sm text-muted-foreground shadow-xs transition-colors',
+                'hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              )}
+              onClick={() => setScannerActive(true)}
+            >
+              Nhấn <span className="font-semibold text-foreground">Bật camera</span> để bắt đầu quét.
+            </button>
+          </div>
         )}
       </div>
 
@@ -262,30 +361,29 @@ export default function CartPayment() {
         draftPrices={draftPrices}
         onDraftPriceChange={onDraftPriceChange}
         onClear={() => {
-          setScannedProducts([])
-          setDraftPrices({})
+          clearCart()
         }}
         onDec={(productId) =>
-          setScannedProducts((prev) => {
-            const idx = prev.findIndex((p) => p.id === productId)
+          setProducts((prev: Product[]) => {
+            const idx = prev.findIndex((p: Product) => p.id === productId)
             if (idx < 0) return prev
             return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
           })
         }
         onInc={(productId) =>
-          setScannedProducts((prev) => {
-            const found = prev.find((p) => p.id === productId)
+          setProducts((prev: Product[]) => {
+            const found = prev.find((p: Product) => p.id === productId)
             if (!found) return prev
             // Append to keep existing group order stable.
             return [...prev, { ...found }]
           })
         }
         onRemoveLine={(productId) =>
-          setScannedProducts((prev) => prev.filter((p) => p.id !== productId))
+          setProducts((prev: Product[]) => prev.filter((p: Product) => p.id !== productId))
         }
         onUpdateUnitPrice={(productId, price) =>
-          setScannedProducts((prev) =>
-            prev.map((p) => (p.id === productId ? { ...p, price } : p)),
+          setProducts((prev: Product[]) =>
+            prev.map((p: Product) => (p.id === productId ? { ...p, price } : p)),
           )
         }
         formatVnd={formatVnd}
@@ -295,10 +393,21 @@ export default function CartPayment() {
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 shadow-[0_-8px_32px_rgba(0,0,0,0.06)] backdrop-blur-md supports-backdrop-filter:bg-card/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <span className="text-sm font-medium text-muted-foreground">Tổng thanh toán</span>
-          <span className="text-xl font-bold tabular-nums tracking-tight text-foreground sm:text-2xl">
-            {formatVnd(cartTotal)}
-          </span>
+          <div>
+            <span className="text-sm font-medium text-muted-foreground">Tổng thanh toán</span>
+            <div className="text-xl font-bold tabular-nums tracking-tight text-foreground sm:text-2xl">
+              {formatVnd(cartTotal)}
+            </div>
+          </div>
+          <Button
+            size="lg"
+            disabled={scannedProducts.length === 0}
+            onClick={() => {
+              navigate('/cart/preview')
+            }}
+          >
+            Thanh toán ({cartLineCount})
+          </Button>
         </div>
         <div
           className="h-[env(safe-area-inset-bottom)] min-h-[env(safe-area-inset-bottom)] bg-card/95"

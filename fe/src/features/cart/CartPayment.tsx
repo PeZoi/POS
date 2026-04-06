@@ -1,6 +1,7 @@
 import * as React from 'react'
 
 import Scanner from '@/features/cart/components/Scanner'
+import PyBarcodeScanner from '@/features/cart/components/PyBarcodeScanner'
 import { useScannerSettings } from '@/features/cart/scanner-config'
 import { CartScanList } from '@/features/cart/components/CartScanList'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,7 @@ const ScanbotBarcodeScanner = React.lazy(
   () => import('@/features/cart/components/ScanbotBarcodeScanner'),
 )
 
-type ScannerMode = 'html5' | 'scanbot'
+type ScannerMode = 'html5' | 'scanbot' | 'python'
 
 export default function CartPayment() {
   const scannerSettings = useScannerSettings()
@@ -28,13 +29,13 @@ export default function CartPayment() {
   const [scannerMode, setScannerMode] = React.useState<ScannerMode>('scanbot')
 
   const onScanbotInitFailed = React.useCallback(() => {
-    setScannerMode('html5')
+    setScannerMode('python')
   }, [])
 
   // Khi vừa chuyển sang chế độ Camera nhanh, cần dừng stream camera cũ ngay (trước khi Scanner mount/start),
   // tránh html5-qrcode bị "AbortError" do race giữa dispose/unmount.
   React.useLayoutEffect(() => {
-    if (scannerMode === 'html5') {
+    if (scannerMode === 'html5' || scannerMode === 'python') {
       stopAllVideoStreamsUnderRoot()
     }
   }, [scannerMode])
@@ -126,15 +127,6 @@ export default function CartPayment() {
           <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
             <Button
               type="button"
-              variant={scannerMode === 'html5' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-[min(var(--radius-md),10px)]"
-              onClick={() => setScannerMode('html5')}
-            >
-              Camera nhanh
-            </Button>
-            <Button
-              type="button"
               variant={scannerMode === 'scanbot' ? 'default' : 'ghost'}
               size="sm"
               className="rounded-[min(var(--radius-md),10px)]"
@@ -142,10 +134,30 @@ export default function CartPayment() {
             >
               Scanbot
             </Button>
+            <Button
+              type="button"
+              variant={scannerMode === 'python' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-[min(var(--radius-md),10px)]"
+              onClick={() => setScannerMode('python')}
+            >
+              Python
+            </Button>
+            <Button
+              type="button"
+              variant={scannerMode === 'html5' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-[min(var(--radius-md),10px)]"
+              onClick={() => setScannerMode('html5')}
+            >
+              Camera nhanh
+            </Button>
           </div>
         </div>
         {scannerMode === 'html5' ? (
           <Scanner onScan={handleScan} settings={scannerSettings} />
+        ) : scannerMode === 'python' ? (
+          <PyBarcodeScanner onScan={handleScan} settings={scannerSettings} />
         ) : (
           <React.Suspense
             fallback={

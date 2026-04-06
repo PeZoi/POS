@@ -5,6 +5,7 @@ import {
 } from '@/features/cart/scanner-config'
 import { stopAllVideoElementStreams } from '@/lib/camera-stream'
 import { playBeep, unlockAudio } from '@/lib/sound-beep'
+import { cn } from '@/lib/utils'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -102,9 +103,12 @@ function qrboxHorizontal(
 export default function Scanner({
   onScan,
   settings = DEFAULT_SCANNER_SETTINGS,
+  embedded = false,
 }: {
   onScan: (item: string) => void
   settings?: ScannerSettings
+  /** Ẩn header/link/mô tả (dùng trong trang giỏ đã có thanh điều hướng). */
+  embedded?: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(true)
@@ -306,35 +310,46 @@ export default function Scanner({
   }, [torchOn])
 
   return (
-    <div className="bg-background pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] text-foreground">
-      <header className="shrink-0 px-4 pb-2 pt-3 sm:px-6 sm:pt-6">
-        <Link
-          className="mb-2.5 inline-block rounded-lg px-2 py-1.5 text-[15px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-          to="/"
-        >
-          ← Trang chủ
-        </Link>
-        <h1 className="mb-1.5 text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
-          Quét mã vạch
-        </h1>
-        <p className="max-w-[56ch] text-sm leading-snug text-muted-foreground">
-          Decode nhanh · {effectiveFps} FPS · EAN/UPC/Code128
-        </p>
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => {
-              void unlockAudio().then(() => playBeep())
-            }}
-            className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    <div
+      className={cn(
+        'text-foreground',
+        !embedded &&
+          'bg-background pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]',
+      )}
+    >
+      {!embedded && (
+        <header className="shrink-0 px-4 pb-2 pt-3 sm:px-6 sm:pt-6">
+          <Link
+            className="mb-2.5 inline-block rounded-lg px-2 py-1.5 text-[15px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            to="/"
           >
-            Bật âm / Test beep
-          </button>
-        </div>
-      </header>
+            ← Trang chủ
+          </Link>
+          <h1 className="mb-1.5 text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
+            Quét mã vạch
+          </h1>
+          <p className="max-w-[56ch] text-sm leading-snug text-muted-foreground">
+            Decode nhanh · {effectiveFps} FPS · EAN/UPC/Code128
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                void unlockAudio().then(() => playBeep())
+              }}
+              className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Bật âm / Test beep
+            </button>
+          </div>
+        </header>
+      )}
 
       <div
-        className="relative mx-3 mt-1 shrink-0 overflow-hidden rounded-2xl border bg-card shadow-xs sm:mx-auto sm:max-w-2xl"
+        className={cn(
+          'relative shrink-0 overflow-hidden rounded-2xl border bg-card shadow-xs sm:mx-auto sm:max-w-2xl',
+          embedded ? 'mx-0 mt-0' : 'mx-3 mt-1',
+        )}
       >
         <div
           className="w-full min-h-0 aspect-video"

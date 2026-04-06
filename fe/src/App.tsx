@@ -10,16 +10,16 @@ import { SettingsPage } from '@/pages/SettingsPage'
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell>
-        <Routes>
+      <Routes>
+        <Route path="/cart" element={<CartPage />} />
+        <Route element={<AppShell />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AppShell>
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   )
 }

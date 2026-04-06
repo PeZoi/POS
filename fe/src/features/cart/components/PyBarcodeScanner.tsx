@@ -1,14 +1,16 @@
 import { DEFAULT_SCANNER_SETTINGS, type ScannerSettings } from '@/features/cart/scanner-config'
 import { usePyBarcodeScanner } from '@/features/cart/hooks/usePyBarcodeScanner'
-import { playBeep, unlockAudio } from '@/lib/sound-beep'
+import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 
 export default function PyBarcodeScanner({
   onScan,
   settings = DEFAULT_SCANNER_SETTINGS,
+  embedded = false,
 }: {
   onScan: (item: string) => void
   settings?: ScannerSettings
+  embedded?: boolean
 }) {
   const {
     videoRef,
@@ -24,49 +26,48 @@ export default function PyBarcodeScanner({
   } = usePyBarcodeScanner(onScan, settings)
 
   return (
-    <div className="bg-background pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] text-foreground">
-      <header className="shrink-0 px-4 pb-2 pt-3 sm:px-6 sm:pt-6">
-        <Link
-          className="mb-2.5 inline-block rounded-lg px-2 py-1.5 text-[15px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-          to="/"
-        >
-          ← Trang chủ
-        </Link>
-        <h1 className="mb-1.5 text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
-          Quét mã vạch
-        </h1>
-        <p className="max-w-[56ch] text-sm leading-snug text-muted-foreground">
-          Scanner Python · OpenCV + WebSocket · vùng hiển thị · cần{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[0.75rem]">python server.py</code> trong{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[0.75rem]">scanner-py</code>
-        </p>
-        {wsHint && (
-          <p className="mt-2 text-xs text-muted-foreground" role="status">
-            {wsHint}
-          </p>
-        )}
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => {
-              void unlockAudio().then(() => playBeep())
-            }}
-            className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    <div
+      className={cn(
+        'text-foreground',
+        !embedded &&
+          'bg-background pb-[calc(env(safe-area-inset-bottom)+12px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]',
+      )}
+    >
+      {!embedded && (
+        <header className="shrink-0 px-4 pb-2 pt-3 sm:px-6 sm:pt-6">
+          <Link
+            className="mb-2.5 inline-block rounded-lg px-2 py-1.5 text-[15px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            to="/"
           >
-            Bật âm / Test beep
-          </button>
-        </div>
-        {import.meta.env.VITE_BARCODE_STRICT_GTIN === 'true' && (
-          <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-            Đang bật <code className="rounded bg-muted px-1 py-0.5">VITE_BARCODE_STRICT_GTIN</code> — chỉ
-            EAN/UPC đúng checksum.
+            ← Trang chủ
+          </Link>
+          <h1 className="mb-1.5 text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
+            Quét mã vạch
+          </h1>
+          <p className="max-w-[56ch] text-sm leading-snug text-muted-foreground">
+            Scanner Python · cần{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-[0.75rem]">python server.py</code> trong{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-[0.75rem]">scanner-py</code>
           </p>
-        )}
-      </header>
+          {wsHint && (
+            <p className="mt-2 text-xs text-muted-foreground" role="status">
+              {wsHint}
+            </p>
+          )}
+          {import.meta.env.VITE_BARCODE_STRICT_GTIN === 'true' && (
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+              Đang bật <code className="rounded bg-muted px-1 py-0.5">VITE_BARCODE_STRICT_GTIN</code>.
+            </p>
+          )}
+        </header>
+      )}
 
       <div
         ref={wrapRef}
-        className="relative mx-3 mt-1 shrink-0 overflow-hidden rounded-2xl border bg-card shadow-xs sm:mx-auto sm:max-w-2xl"
+        className={cn(
+          'relative shrink-0 overflow-hidden rounded-2xl border bg-card shadow-xs sm:mx-auto sm:max-w-2xl',
+          embedded ? 'mx-0 mt-0' : 'mx-3 mt-1',
+        )}
       >
         <div className="aspect-video w-full min-h-0">
           {starting && !error && (
@@ -107,6 +108,11 @@ export default function PyBarcodeScanner({
           </div>
         )}
       </div>
+      {embedded && wsHint && (
+        <p className="mt-1.5 px-0.5 text-[11px] leading-snug text-muted-foreground" role="status">
+          {wsHint}
+        </p>
+      )}
     </div>
   )
 }

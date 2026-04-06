@@ -6,9 +6,14 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import type { Product } from '@/types/pos'
 import { Separator } from '@/components/ui/separator'
+import { cartLinesFromProducts } from '@/features/cart/cart-lines'
+import { digitsOnly, formatThousandsComma } from '@/utils/priceDigits'
+import { ScanLine } from 'lucide-react'
 
 type CartScanListProps = {
   products: Product[]
+  draftPrices: Record<number, string>
+  onDraftPriceChange: (productId: number, raw: string) => void
   onClear: () => void
   onDec: (productId: number) => void
   onInc: (productId: number) => void
@@ -17,13 +22,10 @@ type CartScanListProps = {
   formatVnd: (amount: number) => string
 }
 
-type CartLine = {
-  product: Product
-  quantity: number
-}
-
 export function CartScanList({
   products,
+  draftPrices,
+  onDraftPriceChange,
   onClear,
   onDec,
   onInc,
@@ -31,38 +33,24 @@ export function CartScanList({
   onUpdateUnitPrice,
   formatVnd,
 }: CartScanListProps) {
-  const [draftPrices, setDraftPrices] = React.useState<Record<number, string>>({})
-
-  const lines = React.useMemo(() => {
-    const order: number[] = []
-    const map = new Map<number, CartLine>()
-
-    for (const p of products) {
-      if (!map.has(p.id)) {
-        order.push(p.id)
-        map.set(p.id, { product: p, quantity: 1 })
-      } else {
-        map.get(p.id)!.quantity += 1
-      }
-    }
-
-    return order.map((id) => map.get(id)!)
-  }, [products])
+  const lines = React.useMemo(() => cartLinesFromProducts(products), [products])
+  /** Khi focus: hiển thị số thuần để gõ; blur: hiển thị có dấu phẩy ngăn cách. */
+  const [priceFocused, setPriceFocused] = React.useState<Record<number, boolean>>({})
 
   const getEffectiveUnit = (productId: number, fallback: number) => {
     const raw = draftPrices[productId]
-    const digits = raw?.replace(/[^\d]/g, '') ?? ''
-    if (!digits.length) return fallback
-    const n = Number(digits)
+    const d = raw !== undefined ? digitsOnly(raw) : ''
+    if (!d.length) return fallback
+    const n = Number(d)
     return Number.isFinite(n) && n > 0 ? n : fallback
   }
 
   return (
-    <div className="-mt-2 mx-3 md:mx-0 md:mt-0 md:sticky md:top-6">
+    <div className="mx-3 md:mx-0 md:mt-0 md:sticky md:top-6 mt-5">
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-lg sm:text-xl">Giỏ hàng (scan)</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Giỏ hàng <span className="text-xs text-muted-foreground">{lines.length > 0 ? `(${lines.length} sản phẩm)` : '(Trống)'}</span></CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -72,14 +60,24 @@ export function CartScanList({
               Xoá hết
             </Button>
           </div>
-          <div className="text-base text-muted-foreground">
-            Danh sách sản phẩm vừa quét (tự tạo nếu chưa có trong DB)
-          </div>
         </CardHeader>
         <CardContent>
           {products.length === 0 ? (
-            <div className="py-14 text-center text-base text-muted-foreground">
-              Chưa có mã nào — hãy quét để thêm.
+            <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
+              <div
+                className="relative grid size-18 place-items-center rounded-2xl border border-dashed border-muted-foreground/30 bg-linear-to-br from-muted/50 to-muted/20 text-muted-foreground shadow-inner ring-1 ring-border/40"
+                aria-hidden
+              >
+                <ScanLine className="size-9 opacity-90" strokeWidth={1.65} />
+              </div>
+              <div className="max-w-[28ch] space-y-1.5 text-center">
+                <p className="text-base font-medium tracking-tight text-foreground">
+                  Chưa có sản phẩm
+                </p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Quét mã vạch để thêm vào giỏ hàng
+                </p>
+              </div>
             </div>
           ) : (
             <div className="grid gap-2">
@@ -88,6 +86,14 @@ export function CartScanList({
                 const effectiveUnit = getEffectiveUnit(product.id, product.price)
                 const lineTotal = effectiveUnit * quantity
                 const draftRaw = draftPrices[product.id]
+                const focused = priceFocused[product.id] ?? false
+                const digitStr =
+                  draftRaw !== undefined
+                    ? digitsOnly(draftRaw)
+                    : String(Math.max(0, Math.floor(Number(product.price))))
+                const priceDisplay = focused
+                  ? digitStr
+                  : formatThousandsComma(digitStr)
 
                 return (
                   <div
@@ -95,7 +101,7 @@ export function CartScanList({
                     className="rounded-2xl border bg-muted/10 p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 relative">
-                      <Badge variant="success" className="text-xl font-bold absolute top-[-10px] left-[-10px] size-8 flex items-center justify-center rounded-full" title={`STT: ${idx + 1}`}>
+                      <Badge className="text-md font-bold absolute top-[-5px] left-[-5px] size-6 flex items-center justify-center rounded-full" title={`STT: ${idx + 1}`}>
                         {idx + 1}
                       </Badge>
                       <div className="flex items-center justify-end w-full gap-2">
@@ -149,20 +155,25 @@ export function CartScanList({
 
                       {/* Đơn giá */}
                       <div className="rounded-xl bg-background/40 p-3">
-                        <div className="text-sm font-medium text-muted-foreground">Đơn giá</div>
-                        <div className="mt-2 flex items-center justify-end w-full gap-2">
+                        <div className="text-sm font-medium text-muted-foreground text-center">Đơn giá</div>
+                        <div className="mt-2 flex w-full items-center justify-end gap-2">
                           <Input
                             type="tel"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             autoComplete="off"
                             spellCheck={false}
-                            className="h-10 w-24 rounded-xl text-center text-xl tabular-nums"
-                            value={draftRaw ?? String(product.price)}
+                            className="h-10 min-w-0 max-w-full flex-1 rounded-xl text-center text-xl tabular-nums"
+                            value={priceDisplay}
                             onChange={(e) => {
-                              const next = e.target.value
-                              setDraftPrices((prev) => ({ ...prev, [product.id]: next }))
+                              onDraftPriceChange(product.id, digitsOnly(e.target.value))
                             }}
+                            onFocus={() =>
+                              setPriceFocused((p) => ({ ...p, [product.id]: true }))
+                            }
+                            onBlur={() =>
+                              setPriceFocused((p) => ({ ...p, [product.id]: false }))
+                            }
                           />
                         </div>
                       </div>
@@ -183,7 +194,7 @@ export function CartScanList({
                         className="h-11 flex-1 rounded-xl px-4 text-base"
                         onClick={() => {
                           const raw = draftPrices[product.id]
-                          const digits = raw?.replace(/[^\d]/g, '') ?? ''
+                          const digits = raw !== undefined ? digitsOnly(raw) : ''
                           const n = digits.length ? Number(digits) : NaN
                           if (!Number.isFinite(n) || n <= 0) return
                           onUpdateUnitPrice(product.id, n)

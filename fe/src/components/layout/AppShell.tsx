@@ -1,6 +1,6 @@
 import { LayoutDashboard, Package, ReceiptText, ScanLine, Settings } from 'lucide-react'
 import * as React from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
 
@@ -36,7 +36,7 @@ function AppNavLink({ to, label, icon }: NavItem) {
   )
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell() {
   const leftItems = navItems.slice(0, 2)
   const rightItems = navItems.slice(2)
   const navigate = useNavigate()
@@ -60,7 +60,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </aside>
 
-          <main className="min-w-0">{children}</main>
+          <main className="min-w-0">
+            <Outlet />
+          </main>
         </div>
       </div>
 

@@ -1,15 +1,14 @@
 import * as React from 'react'
 import { Plus, Search, Trash2, Pencil } from 'lucide-react'
 
-import type { CreateProductInput, Product, ProductStatus } from '@/types/pos'
+import type { Product, ProductStatus } from '@/types/pos'
 import { useProducts } from '@/features/products/hooks/useProducts'
+import { ProductFormModal } from '@/features/products/components/ProductFormModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Modal } from '@/components/ui/modal'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -47,114 +46,6 @@ function statusLabel(status: ProductStatus) {
   return status === 'ACTIVE' ? 'Đang bán' : 'Tạm ngưng'
 }
 
-function ProductForm({
-  value,
-  onChange,
-  errors,
-}: {
-  value: CreateProductInput
-  onChange: (next: CreateProductInput) => void
-  errors: Partial<Record<keyof CreateProductInput, string>>
-}) {
-  return (
-    <div className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="name">Tên sản phẩm</Label>
-        <Input
-          id="name"
-          value={value.name}
-          onChange={(e) => onChange({ ...value, name: e.target.value })}
-          placeholder="VD: Gấu bông nhỏ"
-          aria-invalid={Boolean(errors.name)}
-        />
-        {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="barcode">Barcode</Label>
-        <Input
-          id="barcode"
-          value={value.barcode}
-          onChange={(e) => onChange({ ...value, barcode: e.target.value })}
-          placeholder="VD: 893..."
-          inputMode="numeric"
-          aria-invalid={Boolean(errors.barcode)}
-        />
-        {errors.barcode && (
-          <div className="text-sm text-destructive">{errors.barcode}</div>
-        )}
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="price">Giá bán (VND)</Label>
-          <Input
-            id="price"
-            value={String(value.price)}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/[^\d]/g, '')
-              const next = raw === '' ? 0 : Number(raw)
-              onChange({ ...value, price: Number.isFinite(next) ? next : 0 })
-            }}
-            inputMode="numeric"
-            placeholder="59000"
-            aria-invalid={Boolean(errors.price)}
-          />
-          {errors.price && <div className="text-sm text-destructive">{errors.price}</div>}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="status">Trạng thái</Label>
-          <select
-            id="status"
-            className={cn(
-              'h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs',
-              'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-            )}
-            value={value.status}
-            onChange={(e) => onChange({ ...value, status: e.target.value as ProductStatus })}
-          >
-            <option value="ACTIVE">Đang bán</option>
-            <option value="INACTIVE">Tạm ngưng</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/10 px-3 py-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium">Tạo tự động</div>
-          <div className="text-xs text-muted-foreground">
-            Đánh dấu sản phẩm được tạo từ scan/import
-          </div>
-        </div>
-        <Switch
-          checked={value.isAutoCreated}
-          onCheckedChange={(checked) => onChange({ ...value, isAutoCreated: checked })}
-        />
-      </div>
-    </div>
-  )
-}
-
-function validate(input: CreateProductInput) {
-  const errors: Partial<Record<keyof CreateProductInput, string>> = {}
-
-  if (normalize(input.name).length === 0) errors.name = 'Vui lòng nhập tên sản phẩm.'
-  if (normalize(input.barcode).length === 0) errors.barcode = 'Vui lòng nhập barcode.'
-  if (!Number.isInteger(input.price) || input.price < 0)
-    errors.price = 'Giá phải là số nguyên không âm.'
-
-  return errors
-}
-
-const emptyForm: CreateProductInput = {
-  name: '',
-  barcode: '',
-  price: 0,
-  status: 'ACTIVE',
-  isAutoCreated: false,
-}
-
 export function ProductManagement() {
   const { items: products, loading, error, create, update, remove, reload } = useProducts()
 
@@ -164,11 +55,6 @@ export function ProductManagement() {
   const [editing, setEditing] = React.useState<Product | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteTarget, setDeleteTarget] = React.useState<Product | null>(null)
-
-  const [formValue, setFormValue] = React.useState<CreateProductInput>(emptyForm)
-  const [formErrors, setFormErrors] = React.useState<
-    Partial<Record<keyof CreateProductInput, string>>
-  >({})
 
   const filtered = React.useMemo(() => {
     const q = normalize(query)
@@ -190,51 +76,12 @@ export function ProductManagement() {
 
   const openCreate = () => {
     setEditing(null)
-    setFormValue(emptyForm)
-    setFormErrors({})
     setCreateOpen(true)
   }
 
   const openEdit = (p: Product) => {
     setEditing(p)
-    setFormValue({
-      name: p.name,
-      barcode: p.barcode,
-      price: p.price,
-      status: p.status,
-      isAutoCreated: p.isAutoCreated,
-    })
-    setFormErrors({})
     setCreateOpen(true)
-  }
-
-  const closeForm = () => {
-    setCreateOpen(false)
-    setEditing(null)
-  }
-
-  const submitForm = async () => {
-    const errors = validate(formValue)
-    const barcodeNorm = normalize(formValue.barcode)
-    const editingBarcodeNorm = editing ? normalize(editing.barcode) : null
-    const barcodeAlreadyUsed =
-      barcodeNorm.length > 0 &&
-      existingBarcodes.has(barcodeNorm) &&
-      barcodeNorm !== editingBarcodeNorm
-
-    if (barcodeAlreadyUsed) errors.barcode = 'Barcode đã tồn tại (mỗi barcode = 1 sản phẩm).'
-    setFormErrors(errors)
-    if (Object.keys(errors).length > 0) return
-
-    if (!editing) {
-      await create(formValue)
-      setCreateOpen(false)
-      return
-    }
-
-    await update(editing.id, formValue)
-    setCreateOpen(false)
-    setEditing(null)
   }
 
   const confirmDelete = async () => {
@@ -249,9 +96,6 @@ export function ProductManagement() {
           <div className="min-w-0">
             <div className="text-lg font-semibold leading-tight sm:text-xl">
               Quản lý sản phẩm
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              CRUD nhanh cho bảng <span className="font-medium text-foreground">products</span>
             </div>
           </div>
 
@@ -398,9 +242,6 @@ export function ProductManagement() {
           </div>
 
           <div className="md:hidden">
-            <div className="mb-2 text-sm text-muted-foreground">
-              iPhone: dạng thẻ (dễ bấm)
-            </div>
             <div className="grid gap-3">
               {filtered.map((p) => (
                 <Card key={p.id}>
@@ -466,25 +307,20 @@ export function ProductManagement() {
             </div>
           </div>
         </div>
-      <Modal
+
+      <ProductFormModal
         open={createOpen}
         onOpenChange={(o) => {
-          if (!o) closeForm()
+          if (!o) {
+            setCreateOpen(false)
+            setEditing(null)
+          }
         }}
-        title={editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
-        description="1 barcode = 1 sản phẩm."
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={closeForm}>
-              Huỷ
-            </Button>
-            <Button onClick={submitForm}>{editing ? 'Lưu thay đổi' : 'Tạo sản phẩm'}</Button>
-          </div>
-        }
-        size="lg"
-      >
-        <ProductForm value={formValue} onChange={setFormValue} errors={formErrors} />
-      </Modal>
+        editing={editing}
+        existingBarcodes={existingBarcodes}
+        onCreate={create}
+        onUpdate={update}
+      />
 
       <Modal
         open={Boolean(deleteTarget)}
@@ -528,4 +364,3 @@ export function ProductManagement() {
     </div>
   )
 }
-

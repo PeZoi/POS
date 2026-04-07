@@ -1,7 +1,9 @@
 import * as React from 'react'
 
-import type { CreateProductInput, Product } from '@/types/pos'
 import { productService } from '@/services/productService'
+import type { Product, ProductsCreateFn, ProductsUpdateFn } from '@/types/pos'
+
+export type { ProductsCreateFn, ProductsUpdateFn } from '@/types/pos'
 
 export function useProducts() {
   const [items, setItems] = React.useState<Product[]>([])
@@ -25,13 +27,13 @@ export function useProducts() {
     void reload()
   }, [reload])
 
-  const create = React.useCallback(async (input: CreateProductInput) => {
+  const create = React.useCallback<ProductsCreateFn>(async (input) => {
     const created = await productService.create(input)
     setItems((prev) => [created, ...prev])
     return created
   }, [])
 
-  const update = React.useCallback(async (id: number, input: CreateProductInput) => {
+  const update = React.useCallback<ProductsUpdateFn>(async (id, input) => {
     const updated = await productService.update(id, input)
     setItems((prev) => prev.map((p) => (p.id === id ? updated : p)))
     return updated

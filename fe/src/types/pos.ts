@@ -19,6 +19,10 @@ export type CreateProductInput = Pick<
 >
 export type UpdateProductInput = Partial<CreateProductInput>
 
+/** Callback tạo/cập nhật sản phẩm — dùng chung cho hook và modal. */
+export type ProductsCreateFn = (input: CreateProductInput) => Promise<Product>
+export type ProductsUpdateFn = (id: number, input: CreateProductInput) => Promise<Product>
+
 export type PaymentMethod = 'CASH' | 'QR' | 'CARD'
 export type OrderStatus = 'PENDING' | 'PAID' | 'CANCELLED'
 

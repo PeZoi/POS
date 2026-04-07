@@ -35,13 +35,14 @@ export default function CartPayment() {
   const clearCart = useCartStore((s) => s.clear)
   const setDraftPrice = useCartStore((s) => s.setDraftPrice)
   const [scanningLocked, setScanningLocked] = React.useState(false)
+  const [updatingProductId, setUpdatingProductId] = React.useState<number | null>(null)
 
   const [createOpen, setCreateOpen] = React.useState(false)
   const [pendingBarcode, setPendingBarcode] = React.useState<string | null>(null)
   const [scanError, setScanError] = React.useState<string | null>(null)
   const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
   const didFallbackFromPythonRef = React.useRef(false)
-  const [cartToastName, setCartToastName] = React.useState<string | null>(null)
+  const [cartToastMessage, setCartToastMessage] = React.useState<string | null>(null)
   const [cartToastExiting, setCartToastExiting] = React.useState(false)
   const [cartToastNonce, setCartToastNonce] = React.useState(0)
   const cartToastHideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -63,16 +64,35 @@ export default function CartPayment() {
       clearCartToastTimers()
       setCartToastExiting(false)
       setCartToastNonce((n) => n + 1)
-      setCartToastName(productName)
+      setCartToastMessage(`Đã thêm ${productName} vào giỏ hàng`)
       cartToastHideTimerRef.current = setTimeout(() => {
         setCartToastExiting(true)
         cartToastRemoveTimerRef.current = setTimeout(() => {
-          setCartToastName(null)
+          setCartToastMessage(null)
           setCartToastExiting(false)
           cartToastRemoveTimerRef.current = null
         }, 320)
         cartToastHideTimerRef.current = null
       }, 1000)
+    },
+    [clearCartToastTimers],
+  )
+
+  const showPriceUpdatedToast = React.useCallback(
+    (productName: string, priceText: string) => {
+      clearCartToastTimers()
+      setCartToastExiting(false)
+      setCartToastNonce((n) => n + 1)
+      setCartToastMessage(`Đã cập nhật giá ${productName} → ${priceText}`)
+      cartToastHideTimerRef.current = setTimeout(() => {
+        setCartToastExiting(true)
+        cartToastRemoveTimerRef.current = setTimeout(() => {
+          setCartToastMessage(null)
+          setCartToastExiting(false)
+          cartToastRemoveTimerRef.current = null
+        }, 320)
+        cartToastHideTimerRef.current = null
+      }, 1200)
     },
     [clearCartToastTimers],
   )
@@ -242,7 +262,7 @@ export default function CartPayment() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
-      {cartToastName && (
+      {cartToastMessage && (
         <div
           className="pointer-events-none fixed left-1/2 top-[calc(0.65rem+env(safe-area-inset-top))] z-100 flex w-full max-w-full -translate-x-1/2 justify-center px-3"
           role="status"
@@ -262,9 +282,7 @@ export default function CartPayment() {
               aria-hidden
             />
             <p className="min-w-0 max-w-full text-left text-sm leading-snug text-emerald-50">
-              <span className="text-emerald-100/85">Đã thêm </span>
-              <span className="font-semibold wrap-break-word text-white">{cartToastName}</span>
-              <span className="text-emerald-100/85"> vào giỏ hàng</span>
+              <span className="font-semibold wrap-break-word text-white">{cartToastMessage}</span>
             </p>
           </div>
         </div>
@@ -381,11 +399,37 @@ export default function CartPayment() {
         onRemoveLine={(productId) =>
           setProducts((prev: Product[]) => prev.filter((p: Product) => p.id !== productId))
         }
-        onUpdateUnitPrice={(productId, price) =>
-          setProducts((prev: Product[]) =>
-            prev.map((p: Product) => (p.id === productId ? { ...p, price } : p)),
-          )
-        }
+        updatingProductId={updatingProductId}
+        onUpdateUnitPrice={async (productId, price) => {
+          if (updatingProductId !== null) return
+          const current = scannedProducts.find((p) => p.id === productId)
+          if (!current) return
+
+          setUpdatingProductId(productId)
+          try {
+            await productService.update(productId, {
+              name: current.name,
+              barcode: current.barcode,
+              price,
+              status: current.status,
+              isAutoCreated: current.isAutoCreated,
+            })
+
+            setProducts((prev: Product[]) =>
+              prev.map((p: Product) => (p.id === productId ? { ...p, price } : p)),
+            )
+            setDraftPrice(productId, String(price))
+            showPriceUpdatedToast(current.name, formatVnd(price))
+          } catch (e) {
+            const message =
+              e instanceof ApiError || e instanceof Error
+                ? e.message
+                : 'Không thể cập nhật giá.'
+            globalThis.alert?.(message)
+          } finally {
+            setUpdatingProductId(null)
+          }
+        }}
         formatVnd={formatVnd}
       />
         </div>

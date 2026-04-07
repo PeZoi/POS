@@ -1,5 +1,5 @@
 import type { Product } from '@/types/pos'
-import { digitsOnly } from '@/utils/priceDigits'
+import { digitsOnly, stripLeadingZeros } from '@/utils/priceDigits'
 
 export type CartLine = {
   product: Product
@@ -28,7 +28,7 @@ export function effectiveUnitFromDraft(
   draftPrices: Record<number, string>,
 ): number {
   const raw = draftPrices[productId]
-  const digits = raw !== undefined ? digitsOnly(raw) : ''
+  const digits = raw !== undefined ? stripLeadingZeros(digitsOnly(raw)) : ''
   if (!digits.length) return fallback
   const n = Number(digits)
   return Number.isFinite(n) && n > 0 ? n : fallback

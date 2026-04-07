@@ -6,7 +6,7 @@ import { useCartStore } from '@/features/cart/cart-store'
 import { cartLinesFromProducts, effectiveUnitFromDraft } from '@/features/cart/cart-lines'
 import { orderService, type OrderItemCreate } from '@/services/orderService'
 import { cn } from '@/lib/utils'
-import { digitsOnly, formatThousandsComma } from '@/utils/priceDigits'
+import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
 import { ArrowLeft, ReceiptText, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Separator } from '@/components/ui/separator'
@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 type PreviewLine = {
   productId: number
   productName: string
-  quantity: number
+  quantityRaw: string
   unitPriceRaw: string
 }
 
@@ -46,6 +46,11 @@ function moveCaretToEndOnFocus(e: React.FocusEvent<HTMLInputElement>) {
   }, 0)
 }
 
+function unitPriceInputValue(raw: string): string {
+  if (raw === '') return ''
+  return formatThousandsComma(raw)
+}
+
 export default function CartInvoicePreview() {
   const navigate = useNavigate()
   const products = useCartStore((s) => s.products)
@@ -56,7 +61,7 @@ export default function CartInvoicePreview() {
     cartLinesFromProducts(products).map((line) => ({
       productId: line.product.id,
       productName: line.product.name,
-      quantity: Math.max(1, Math.floor(line.quantity)),
+      quantityRaw: String(Math.max(1, Math.floor(line.quantity))),
       unitPriceRaw: String(
         effectiveUnitFromDraft(line.product.id, line.product.price, draftPrices),
       ),
@@ -64,6 +69,62 @@ export default function CartInvoicePreview() {
   )
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+
+  const linesRef = React.useRef(lines)
+  React.useEffect(() => {
+    linesRef.current = lines
+  }, [lines])
+
+  const unitPriceSnapRef = React.useRef<Map<number, string>>(new Map())
+  const quantitySnapRef = React.useRef<Map<number, string>>(new Map())
+
+  const onUnitPriceFocus = React.useCallback((idx: number, e: React.FocusEvent<HTMLInputElement>) => {
+    unitPriceSnapRef.current.set(idx, linesRef.current[idx]?.unitPriceRaw ?? '')
+    moveCaretToEndOnFocus(e)
+  }, [])
+
+  const onUnitPriceBlur = React.useCallback((idx: number) => {
+    setLines((prev) =>
+      prev.map((x, i) => {
+        if (i !== idx) return x
+        const raw = stripLeadingZeros(digitsOnly(x.unitPriceRaw))
+        if (raw === '') {
+          const snap = unitPriceSnapRef.current.get(idx)
+          unitPriceSnapRef.current.delete(idx)
+          return { ...x, unitPriceRaw: snap !== undefined ? snap : '0' }
+        }
+        unitPriceSnapRef.current.delete(idx)
+        return { ...x, unitPriceRaw: raw }
+      }),
+    )
+  }, [])
+
+  const onQuantityFocus = React.useCallback((idx: number, e: React.FocusEvent<HTMLInputElement>) => {
+    quantitySnapRef.current.set(idx, linesRef.current[idx]?.quantityRaw ?? '1')
+    moveCaretToEndOnFocus(e)
+  }, [])
+
+  const onQuantityBlur = React.useCallback((idx: number) => {
+    setLines((prev) =>
+      prev.map((x, i) => {
+        if (i !== idx) return x
+        const raw = stripLeadingZeros(digitsOnly(x.quantityRaw))
+        if (raw === '') {
+          const snap = quantitySnapRef.current.get(idx) ?? '1'
+          quantitySnapRef.current.delete(idx)
+          return { ...x, quantityRaw: snap }
+        }
+        const n = parsePositiveInt(raw, 0)
+        if (n < 1) {
+          const snap = quantitySnapRef.current.get(idx) ?? '1'
+          quantitySnapRef.current.delete(idx)
+          return { ...x, quantityRaw: snap }
+        }
+        quantitySnapRef.current.delete(idx)
+        return { ...x, quantityRaw: String(Math.floor(n)) }
+      }),
+    )
+  }, [])
 
   React.useEffect(() => {
     // Nếu mở preview mà không có giỏ → quay lại.
@@ -78,7 +139,7 @@ export default function CartInvoicePreview() {
       cartLinesFromProducts(products).map((line) => ({
         productId: line.product.id,
         productName: line.product.name,
-        quantity: Math.max(1, Math.floor(line.quantity)),
+        quantityRaw: String(Math.max(1, Math.floor(line.quantity))),
         unitPriceRaw: String(
           effectiveUnitFromDraft(line.product.id, line.product.price, draftPrices),
         ),
@@ -89,8 +150,11 @@ export default function CartInvoicePreview() {
   const total = React.useMemo(
     () =>
       lines.reduce((sum, line) => {
-        const price = parsePositiveInt(line.unitPriceRaw, 0)
-        return sum + price * line.quantity
+        const price =
+          line.unitPriceRaw === '' ? 0 : parsePositiveInt(line.unitPriceRaw, 0)
+        const qty =
+          line.quantityRaw === '' ? 0 : parsePositiveInt(line.quantityRaw, 1)
+        return sum + price * qty
       }, 0),
     [lines],
   )
@@ -102,7 +166,7 @@ export default function CartInvoicePreview() {
     try {
       const items: OrderItemCreate[] = lines.map((line) => ({
         productId: line.productId,
-        quantity: Math.max(1, Math.floor(line.quantity)),
+        quantity: Math.max(1, Math.floor(parsePositiveInt(line.quantityRaw, 1))),
         unitPrice: parsePositiveInt(line.unitPriceRaw, 0),
       }))
       await orderService.create({
@@ -192,8 +256,11 @@ export default function CartInvoicePreview() {
                       </td>
                     </tr>
                     {lines.map((line, idx) => {
-                      const unitPrice = parsePositiveInt(line.unitPriceRaw, 0)
-                      const lineTotal = unitPrice * line.quantity
+                      const unitPrice =
+                        line.unitPriceRaw === '' ? 0 : parsePositiveInt(line.unitPriceRaw, 0)
+                      const qty =
+                        line.quantityRaw === '' ? 0 : parsePositiveInt(line.quantityRaw, 1)
+                      const lineTotal = unitPrice * qty
 
                       return (
                         <React.Fragment key={line.productId}>
@@ -210,11 +277,9 @@ export default function CartInvoicePreview() {
                             <td className="px-3 pb-3" colSpan={4}>
                               <div className="grid grid-cols-3 gap-2">
                                 <Input
-                                  value={
-                                    line.unitPriceRaw ? formatThousandsComma(line.unitPriceRaw) : '0'
-                                  }
+                                  value={unitPriceInputValue(line.unitPriceRaw)}
                                   onChange={(e) => {
-                                    const raw = digitsOnly(e.target.value)
+                                    const raw = stripLeadingZeros(digitsOnly(e.target.value))
                                     setLines((prev) =>
                                       prev.map((x, i) =>
                                         i === idx ? { ...x, unitPriceRaw: raw } : x,
@@ -224,22 +289,24 @@ export default function CartInvoicePreview() {
                                   inputMode="numeric"
                                   className="h-10 rounded-lg text-right text-base tabular-nums"
                                   aria-label="Đơn giá"
-                                  onFocus={moveCaretToEndOnFocus}
+                                  onFocus={(e) => onUnitPriceFocus(idx, e)}
+                                  onBlur={() => onUnitPriceBlur(idx)}
                                 />
                                 <Input
-                                  value={String(line.quantity)}
+                                  value={line.quantityRaw}
                                   onChange={(e) => {
-                                    const qty = parsePositiveInt(e.target.value, 1)
+                                    const raw = stripLeadingZeros(digitsOnly(e.target.value))
                                     setLines((prev) =>
                                       prev.map((x, i) =>
-                                        i === idx ? { ...x, quantity: qty } : x,
+                                        i === idx ? { ...x, quantityRaw: raw } : x,
                                       ),
                                     )
                                   }}
                                   inputMode="numeric"
                                   className="h-10 rounded-lg text-right text-base tabular-nums"
                                   aria-label="Số lượng"
-                                  onFocus={moveCaretToEndOnFocus}
+                                  onFocus={(e) => onQuantityFocus(idx, e)}
+                                  onBlur={() => onQuantityBlur(idx)}
                                 />
                                 <div className="flex h-10 items-center justify-end rounded-lg bg-muted/20 px-3 text-right text-sm font-bold tabular-nums text-foreground">
                                   {toVnd(lineTotal)}
@@ -258,30 +325,32 @@ export default function CartInvoicePreview() {
                             </td>
                             <td className="p-3 align-middle">
                               <Input
-                                value={line.unitPriceRaw ? formatThousandsComma(line.unitPriceRaw) : '0'}
+                                value={unitPriceInputValue(line.unitPriceRaw)}
                                 onChange={(e) => {
-                                  const raw = digitsOnly(e.target.value)
+                                  const raw = stripLeadingZeros(digitsOnly(e.target.value))
                                   setLines((prev) =>
                                     prev.map((x, i) => (i === idx ? { ...x, unitPriceRaw: raw } : x)),
                                   )
                                 }}
                                 inputMode="numeric"
                                 className="h-10 rounded-xl text-right tabular-nums"
-                                onFocus={moveCaretToEndOnFocus}
+                                onFocus={(e) => onUnitPriceFocus(idx, e)}
+                                onBlur={() => onUnitPriceBlur(idx)}
                               />
                             </td>
                             <td className="p-3 align-middle">
                               <Input
-                                value={String(line.quantity)}
+                                value={line.quantityRaw}
                                 onChange={(e) => {
-                                  const qty = parsePositiveInt(e.target.value, 1)
+                                  const raw = stripLeadingZeros(digitsOnly(e.target.value))
                                   setLines((prev) =>
-                                    prev.map((x, i) => (i === idx ? { ...x, quantity: qty } : x)),
+                                    prev.map((x, i) => (i === idx ? { ...x, quantityRaw: raw } : x)),
                                   )
                                 }}
                                 inputMode="numeric"
                                 className="h-10 rounded-xl text-right tabular-nums"
-                                onFocus={moveCaretToEndOnFocus}
+                                onFocus={(e) => onQuantityFocus(idx, e)}
+                                onBlur={() => onQuantityBlur(idx)}
                               />
                             </td>
                             <td className="p-3 align-middle text-right font-semibold tabular-nums">

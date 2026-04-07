@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 
@@ -25,6 +28,9 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+
+    private static final SecureRandom RAND = new SecureRandom();
+    private static final DateTimeFormatter ORDER_CODE_DATE = DateTimeFormatter.ofPattern("ddMMyy");
 
     @Override
     public List<OrderResponse> list() {
@@ -46,6 +52,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse create(OrderCreateRequest request) {
         OrderEntity order = new OrderEntity();
+        order.setOrderCode(generateUniqueOrderCode());
         order.setPaymentMethod(request.paymentMethod());
         order.setStatus(request.status());
 
@@ -101,6 +108,22 @@ public class OrderServiceImpl implements OrderService {
             order.getItems().add(entity);
         }
         order.setTotalAmount(total);
+    }
+
+    /**
+     * Format: ddMMyy + 3 số random (000-999), ví dụ 070426123.
+     * Có kiểm tra trùng để tránh collision (hiếm).
+     */
+    private String generateUniqueOrderCode() {
+        String prefix = LocalDate.now().format(ORDER_CODE_DATE);
+        for (int i = 0; i < 25; i++) {
+            int suffix = RAND.nextInt(1000);
+            String code = prefix + String.format("%03d", suffix);
+            if (!orderRepository.existsByOrderCode(code)) return code;
+        }
+        // fallback cực hiếm: dùng 4 số (vẫn giữ prefix ddMMyy) để tránh fail request
+        int suffix = RAND.nextInt(10_000);
+        return prefix + String.format("%04d", suffix);
     }
 }
 

@@ -19,6 +19,7 @@ public class OrderMapper {
                 .toList();
         return new OrderResponse(
                 order.getId(),
+                order.getOrderCode(),
                 order.getTotalAmount(),
                 order.getPaymentMethod(),
                 order.getStatus(),

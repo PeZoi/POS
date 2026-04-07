@@ -237,7 +237,10 @@ export function OrderManagement() {
     const q = normalize(query)
     return orders.filter((o) => {
       const matchStatus = statusFilter === 'ALL' ? true : o.status === statusFilter
-      const matchQuery = q.length === 0 ? true : String(o.id).includes(q)
+      const matchQuery =
+        q.length === 0
+          ? true
+          : String(o.orderCode ?? '').includes(q) || String(o.id).includes(q)
       return matchStatus && matchQuery
     })
   }, [orders, query, statusFilter])
@@ -301,9 +304,6 @@ export function OrderManagement() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="text-lg font-semibold leading-tight sm:text-xl">Quản lý hoá đơn</div>
-          <div className="mt-1 text-sm text-muted-foreground">
-            CRUD nhanh cho bảng <span className="font-medium text-foreground">orders</span>
-          </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button onClick={openCreate} className="w-full sm:w-auto">
@@ -328,7 +328,7 @@ export function OrderManagement() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo mã hoá đơn (ID)…"
+            placeholder="Tìm theo mã hoá đơn…"
             className="pl-9"
           />
         </div>
@@ -352,7 +352,7 @@ export function OrderManagement() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[90px]">ID</TableHead>
+              <TableHead className="w-[130px]">Mã</TableHead>
               <TableHead className="w-[160px]">Trạng thái</TableHead>
               <TableHead className="w-[140px]">Thanh toán</TableHead>
               <TableHead className="text-right">Tổng tiền</TableHead>
@@ -363,7 +363,9 @@ export function OrderManagement() {
           <TableBody>
             {filtered.map((o) => (
               <TableRow key={o.id}>
-                <TableCell className="text-muted-foreground">{o.id}</TableCell>
+                <TableCell className="font-medium tabular-nums">
+                  {o.orderCode ?? String(o.id)}
+                </TableCell>
                 <TableCell>
                   <Badge variant={statusBadgeVariant(o.status)}>{statusLabel(o.status)}</Badge>
                 </TableCell>
@@ -427,7 +429,9 @@ export function OrderManagement() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <CardTitle className="truncate">Hoá đơn #{o.id}</CardTitle>
+                    <CardTitle className="truncate">
+                      #{o.orderCode ?? String(o.id)}
+                    </CardTitle>
                     <div className="mt-1 text-xs text-muted-foreground tabular-nums">
                       {formatCreatedAt(o.createdAt)}
                     </div>
@@ -526,7 +530,10 @@ export function OrderManagement() {
           deleteTarget ? (
             <span>
               Bạn chắc chắn muốn xoá hoá đơn{' '}
-              <span className="font-medium text-foreground">#{deleteTarget.id}</span>?
+              <span className="font-medium text-foreground">
+                #{deleteTarget.orderCode ?? String(deleteTarget.id)}
+              </span>
+              ?
             </span>
           ) : null
         }
@@ -565,7 +572,11 @@ export function OrderManagement() {
         onOpenChange={(o) => {
           if (!o) setViewTarget(null)
         }}
-        title={viewTarget ? `Chi tiết hoá đơn #${viewTarget.id}` : 'Chi tiết hoá đơn'}
+        title={
+          viewTarget
+            ? `Chi tiết hoá đơn #${viewTarget.orderCode ?? String(viewTarget.id)}`
+            : 'Chi tiết hoá đơn'
+        }
         description="Danh sách order_items từ backend."
         footer={
           <div className="flex justify-end">

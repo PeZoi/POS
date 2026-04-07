@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import type { Product } from '@/types/pos'
 import { Separator } from '@/components/ui/separator'
 import { cartLinesFromProducts } from '@/features/cart/cart-lines'
-import { digitsOnly, formatThousandsComma } from '@/utils/priceDigits'
+import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
 import { ScanLine } from 'lucide-react'
 
 type CartScanListProps = {
@@ -18,7 +18,8 @@ type CartScanListProps = {
   onDec: (productId: number) => void
   onInc: (productId: number) => void
   onRemoveLine: (productId: number) => void
-  onUpdateUnitPrice: (productId: number, price: number) => void
+  onUpdateUnitPrice: (productId: number, price: number) => Promise<void> | void
+  updatingProductId?: number | null
   formatVnd: (amount: number) => string
 }
 
@@ -31,15 +32,31 @@ export function CartScanList({
   onInc,
   onRemoveLine,
   onUpdateUnitPrice,
+  updatingProductId = null,
   formatVnd,
 }: CartScanListProps) {
   const lines = React.useMemo(() => cartLinesFromProducts(products), [products])
-  /** Khi focus: hiển thị số thuần để gõ; blur: hiển thị có dấu phẩy ngăn cách. */
-  const [priceFocused, setPriceFocused] = React.useState<Record<number, boolean>>({})
+
+  function moveCaretToEndOnFocus(e: React.FocusEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    const len = el.value.length
+    window.setTimeout(() => {
+      try {
+        el.setSelectionRange(len, len)
+      } catch {
+        // ignore
+      }
+    }, 0)
+  }
+
+  function unitPriceInputValue(raw: string): string {
+    if (raw === '') return ''
+    return formatThousandsComma(raw)
+  }
 
   const getEffectiveUnit = (productId: number, fallback: number) => {
     const raw = draftPrices[productId]
-    const d = raw !== undefined ? digitsOnly(raw) : ''
+    const d = raw !== undefined ? stripLeadingZeros(digitsOnly(raw)) : ''
     if (!d.length) return fallback
     const n = Number(d)
     return Number.isFinite(n) && n > 0 ? n : fallback
@@ -86,14 +103,10 @@ export function CartScanList({
                 const effectiveUnit = getEffectiveUnit(product.id, product.price)
                 const lineTotal = effectiveUnit * quantity
                 const draftRaw = draftPrices[product.id]
-                const focused = priceFocused[product.id] ?? false
-                const digitStr =
+                const unitPriceRaw =
                   draftRaw !== undefined
-                    ? digitsOnly(draftRaw)
+                    ? stripLeadingZeros(digitsOnly(draftRaw))
                     : String(Math.max(0, Math.floor(Number(product.price))))
-                const priceDisplay = focused
-                  ? digitStr
-                  : formatThousandsComma(digitStr)
 
                 return (
                   <div
@@ -164,16 +177,18 @@ export function CartScanList({
                             autoComplete="off"
                             spellCheck={false}
                             className="h-10 min-w-0 max-w-full flex-1 rounded-xl text-center text-xl tabular-nums"
-                            value={priceDisplay}
+                            value={unitPriceInputValue(unitPriceRaw)}
                             onChange={(e) => {
-                              onDraftPriceChange(product.id, digitsOnly(e.target.value))
+                              onDraftPriceChange(
+                                product.id,
+                                stripLeadingZeros(digitsOnly(e.target.value)),
+                              )
                             }}
-                            onFocus={() =>
-                              setPriceFocused((p) => ({ ...p, [product.id]: true }))
-                            }
-                            onBlur={() =>
-                              setPriceFocused((p) => ({ ...p, [product.id]: false }))
-                            }
+                            onBlur={(e) => {
+                              const digits = digitsOnly(e.currentTarget.value)
+                              if (digits === '') onDraftPriceChange(product.id, '0')
+                            }}
+                            onFocus={moveCaretToEndOnFocus}
                           />
                         </div>
                       </div>
@@ -192,15 +207,21 @@ export function CartScanList({
                         type="button"
                         variant="outline"
                         className="h-11 flex-1 rounded-xl px-4 text-base"
+                        disabled={updatingProductId === product.id}
                         onClick={() => {
                           const raw = draftPrices[product.id]
-                          const digits = raw !== undefined ? digitsOnly(raw) : ''
+                          const digits =
+                            raw !== undefined ? stripLeadingZeros(digitsOnly(raw)) : ''
                           const n = digits.length ? Number(digits) : NaN
                           if (!Number.isFinite(n) || n <= 0) return
-                          onUpdateUnitPrice(product.id, n)
+                          const ok = globalThis.confirm?.(
+                            `Cập nhật giá cho "${product.name}" thành ${formatThousandsComma(String(n))}₫?`,
+                          )
+                          if (!ok) return
+                          void onUpdateUnitPrice(product.id, n)
                         }}
                       >
-                        Cập nhật giá
+                        {updatingProductId === product.id ? 'Đang cập nhật…' : 'Cập nhật giá'}
                       </Button>
                       <Button
                         variant="destructive"

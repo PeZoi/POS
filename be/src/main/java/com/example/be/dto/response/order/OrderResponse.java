@@ -10,6 +10,7 @@ import java.util.List;
 @Schema(name = "OrderResponse")
 public record OrderResponse(
         Long id,
+        String orderCode,
         Integer totalAmount,
         PaymentMethod paymentMethod,
         OrderStatus status,

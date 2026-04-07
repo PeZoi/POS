@@ -1,16 +1,17 @@
 import * as React from 'react'
-import { Plus, Search, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 
 import type { Product, ProductStatus } from '@/types/pos'
 import { useProducts } from '@/features/products/hooks/useProducts'
 import { ProductFormModal } from '@/features/products/components/ProductFormModal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { normalizeProductSearchText, productMatchesSearchQuery } from '@/features/products/utils/productSearch'
+import { ProductSearch } from '@/features/products/components/ProductSearch'
 
 type StatusFilter = 'ALL' | ProductStatus
 
@@ -34,10 +35,6 @@ function formatUpdatedAt(iso?: string) {
   }).format(d)
 }
 
-function normalize(s: string) {
-  return s.trim().toLowerCase()
-}
-
 function statusBadgeVariant(status: ProductStatus) {
   return status === 'ACTIVE' ? 'success' : 'muted'
 }
@@ -50,27 +47,64 @@ export function ProductManagement() {
   const { items: products, loading, error, create, update, remove, reload } = useProducts()
 
   const [query, setQuery] = React.useState('')
+  const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ALL')
+  const [visibleCount, setVisibleCount] = React.useState(50)
+  const loadMoreRef = React.useRef<HTMLDivElement | null>(null)
+  const [searchLoading, setSearchLoading] = React.useState(false)
+  const [searchError, setSearchError] = React.useState<string | null>(null)
+  const [searchResults, setSearchResults] = React.useState<Product[] | null>(null)
 
   const [editing, setEditing] = React.useState<Product | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteTarget, setDeleteTarget] = React.useState<Product | null>(null)
 
   const filtered = React.useMemo(() => {
-    const q = normalize(query)
-    return products.filter((p) => {
+    const base: Product[] =
+      debouncedQuery && searchResults !== null ? searchResults : products
+    const q = normalizeProductSearchText(debouncedQuery)
+
+    const list = base.filter((p) => {
       const matchStatus = statusFilter === 'ALL' ? true : p.status === statusFilter
-      const matchQuery =
-        q.length === 0
-          ? true
-          : normalize(p.name).includes(q) || normalize(p.barcode).includes(q)
+      const matchQuery = productMatchesSearchQuery(p, q)
       return matchStatus && matchQuery
     })
-  }, [products, query, statusFilter])
+    return list
+  }, [products, debouncedQuery, statusFilter, searchResults])
+
+  const visible = React.useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  )
+
+  React.useEffect(() => {
+    setVisibleCount(50)
+  }, [query, statusFilter, products.length])
+
+  React.useEffect(() => {
+    const el = loadMoreRef.current
+    if (!el) return
+
+    if (visible.length >= filtered.length) return
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev >= filtered.length) return prev
+            return Math.min(prev + 50, filtered.length)
+          })
+        }
+      }
+    })
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [filtered.length, visible.length])
 
   const existingBarcodes = React.useMemo(() => {
     const set = new Set<string>()
-    for (const p of products) set.add(normalize(p.barcode))
+    for (const p of products) set.add(normalizeProductSearchText(p.barcode))
     return set
   }, [products])
 
@@ -100,34 +134,46 @@ export function ProductManagement() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button onClick={openCreate} className="w-full sm:w-auto">
+            <Button
+              onClick={openCreate}
+              size="lg"
+              className="w-full sm:w-auto rounded-xl px-5 text-base"
+            >
               <Plus className="mr-1.5 size-4" />
               Thêm sản phẩm
             </Button>
             <Button
               variant="outline"
               onClick={() => void reload()}
-              className="w-full sm:w-auto"
+              size="lg"
+              className="w-full sm:w-auto rounded-xl px-5 text-base"
             >
               Tải lại
             </Button>
           </div>
         </div>
 
-        {error && (
+        {(error || searchError) && (
           <div className="rounded-2xl border bg-destructive/5 p-3 text-sm text-destructive">
-            {error}
+            {error ?? searchError}
           </div>
         )}
 
         <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+            <ProductSearch
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onValueChange={setQuery}
               placeholder="Tìm theo tên hoặc barcode…"
-              className="pl-9"
+              limit={100}
+              debounceMs={320}
+              inputClassName="pl-9"
+              onStateChange={(s) => {
+                setDebouncedQuery(s.debouncedQuery)
+                setSearchLoading(s.loading)
+                setSearchError(s.error)
+                setSearchResults(s.debouncedQuery ? s.results : null)
+              }}
             />
           </div>
 
@@ -151,7 +197,7 @@ export function ProductManagement() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle>
-                    {loading ? 'Đang tải…' : `Danh sách (${filtered.length})`}
+                    {loading || searchLoading ? 'Đang tải…' : `Danh sách (${filtered.length})`}
                   </CardTitle>
                   <div className="text-sm text-muted-foreground">
                     iPad/desktop: dạng bảng
@@ -173,7 +219,7 @@ export function ProductManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((p) => (
+                    {visible.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="text-muted-foreground">{p.id}</TableCell>
                         <TableCell className="font-medium">{p.name}</TableCell>
@@ -243,7 +289,7 @@ export function ProductManagement() {
 
           <div className="md:hidden">
             <div className="grid gap-3">
-              {filtered.map((p) => (
+              {visible.map((p) => (
                 <Card key={p.id}>
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-3">
@@ -305,6 +351,12 @@ export function ProductManagement() {
                 </Card>
               )}
             </div>
+          </div>
+          <div
+            ref={loadMoreRef}
+            className="mt-2 h-8 w-full text-center text-xs text-muted-foreground"
+          >
+            {visible.length < filtered.length && 'Đang tải thêm sản phẩm…'}
           </div>
         </div>
 

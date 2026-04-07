@@ -3,8 +3,7 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { useCartStore } from '@/features/cart/cart-store'
 import { cartGrandTotal, cartLinesFromProducts } from '@/features/cart/cart-lines'
-import Scanner from '@/features/cart/components/Scanner'
-import PyBarcodeScanner from '@/features/cart/components/PyBarcodeScanner'
+import { EmbeddedBarcodeScannerSection } from '@/features/cart/components/EmbeddedBarcodeScannerSection'
 import { useScannerSettings } from '@/features/cart/scanner-config'
 import { CartProductSearch } from '@/features/cart/components/CartProductSearch'
 import { CartScanList } from '@/features/cart/components/CartScanList'
@@ -19,15 +18,9 @@ import { cn } from '@/lib/utils'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
-const ScanbotBarcodeScanner = React.lazy(
-  () => import('@/features/cart/components/ScanbotBarcodeScanner'),
-)
-
 export default function CartPayment() {
   const navigate = useNavigate()
   const scannerSettings = useScannerSettings()
-
-  const [scannerActive, setScannerActive] = React.useState(false)
 
   const scannedProducts = useCartStore((s) => s.products)
   const draftPrices = useCartStore((s) => s.draftPrices)
@@ -41,7 +34,6 @@ export default function CartPayment() {
   const [pendingBarcode, setPendingBarcode] = React.useState<string | null>(null)
   const [scanError, setScanError] = React.useState<string | null>(null)
   const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
-  const didFallbackFromPythonRef = React.useRef(false)
   const [cartToastMessage, setCartToastMessage] = React.useState<string | null>(null)
   const [cartToastExiting, setCartToastExiting] = React.useState(false)
   const [cartToastNonce, setCartToastNonce] = React.useState(0)
@@ -132,39 +124,6 @@ export default function CartPayment() {
   }, [])
 
   // Giỏ hàng được persist: không tự clear khi vào trang.
-
-  const onScanbotInitFailed = React.useCallback(() => {
-    setScannerMode('python')
-  }, [])
-
-  const onPythonScannerError = React.useCallback(() => {
-    // Tránh loop fallback liên tục khi re-render.
-    if (didFallbackFromPythonRef.current) return
-    didFallbackFromPythonRef.current = true
-    setScannerMode('html5')
-  }, [])
-
-  React.useEffect(() => {
-    // Khi rời python mode (hoặc tắt scanner), reset cờ để lần sau có thể fallback lại.
-    if (scannerMode !== 'python' || !scannerActive) {
-      didFallbackFromPythonRef.current = false
-    }
-  }, [scannerActive, scannerMode])
-
-  // Khi vừa chuyển sang chế độ Camera nhanh, cần dừng stream camera cũ ngay (trước khi Scanner mount/start),
-  // tránh html5-qrcode bị "AbortError" do race giữa dispose/unmount.
-  React.useLayoutEffect(() => {
-    if (scannerMode === 'html5' || scannerMode === 'python') {
-      stopAllVideoStreamsUnderRoot()
-    }
-  }, [scannerMode])
-
-  /** Chạy trước useEffect cleanup của Scanner → dừng camera ngay khi thoát /cart. */
-  React.useLayoutEffect(() => {
-    return () => {
-      stopAllVideoStreamsUnderRoot()
-    }
-  }, [])
 
   // Used to let Scanner resume only after modal create/close flow finishes.
   const scanProcessingResolveRef = React.useRef<null | (() => void)>(null)
@@ -310,68 +269,13 @@ export default function CartPayment() {
           onQuickAdd={() => void openCreatePopup(null)}
           formatVnd={formatVnd}
         />
-        <div className="flex items-center justify-between gap-2 px-2">
-          <div className="text-sm font-medium text-foreground">Camera quét</div>
-          <Button
-            type="button"
-            variant={scannerActive ? 'outline' : 'default'}
-            size="sm"
-            onClick={() => {
-              if (scannerActive) {
-                setScannerActive(false)
-                stopAllVideoStreamsUnderRoot()
-                return
-              }
-              // iOS Safari: bật lại camera sau back/forward đôi lúc gây reload/crash nếu stream cũ chưa dọn kịp.
-              // Dọn sạch trước, rồi mount scanner ở frame kế tiếp để giảm race.
-              stopAllVideoStreamsUnderRoot()
-              window.requestAnimationFrame(() => setScannerActive(true))
-            }}
-          >
-            {scannerActive ? 'Tắt camera' : 'Bật camera'}
-          </Button>
-        </div>
-
-        {scannerActive ? (
-          scannerMode === 'html5' ? (
-            <Scanner embedded onScan={handleScan} settings={scannerSettings} />
-          ) : scannerMode === 'python' ? (
-            <PyBarcodeScanner
-              embedded
-              onScan={handleScan}
-              settings={scannerSettings}
-              onError={onPythonScannerError}
-            />
-          ) : (
-            <React.Suspense
-              fallback={
-                <div className="rounded-2xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground shadow-xs">
-                  Đang tải Scanbot…
-                </div>
-              }
-            >
-              <ScanbotBarcodeScanner
-                embedded
-                onScan={handleScan}
-                onInitFailed={onScanbotInitFailed}
-                settings={scannerSettings}
-              />
-            </React.Suspense>
-          )
-        ) : (
-          <div className="px-4">
-            <button
-              type="button"
-              className={cn(
-                'w-full rounded-2xl border border-dashed bg-card px-4 py-10 text-center text-sm text-muted-foreground shadow-xs transition-colors',
-                'hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              )}
-              onClick={() => setScannerActive(true)}
-            >
-              Nhấn <span className="font-semibold text-foreground">Bật camera</span> để bắt đầu quét.
-            </button>
-          </div>
-        )}
+        <EmbeddedBarcodeScannerSection
+          layout="panel"
+          onScan={handleScan}
+          settings={scannerSettings}
+          scannerMode={scannerMode}
+          onScannerModeChange={setScannerMode}
+        />
       </div>
 
       <CartScanList

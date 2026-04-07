@@ -11,8 +11,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Modal } from '@/components/ui/modal'
-import { Switch } from '@/components/ui/switch'
+import { EmbeddedBarcodeScannerSection } from '@/features/cart/components/EmbeddedBarcodeScannerSection'
+import { useScannerSettings } from '@/features/cart/scanner-config'
+import type { ScannerModeId } from '@/features/cart/scanner-mode'
+import { stopAllVideoStreamsUnderRoot } from '@/lib/camera-stream'
 import { cn } from '@/lib/utils'
+import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
+import { ScanLine } from 'lucide-react'
 
 function normalize(s: string) {
   return s.trim().toLowerCase()
@@ -22,10 +27,22 @@ function ProductFormFields({
   value,
   onChange,
   errors,
+  barcodeScannerOpen,
+  onToggleBarcodeScanner,
+  barcodeScannerSlot,
+  priceRaw,
+  onPriceRawChange,
+  isEditing,
 }: {
   value: CreateProductInput
   onChange: (next: CreateProductInput) => void
   errors: Partial<Record<keyof CreateProductInput, string>>
+  barcodeScannerOpen: boolean
+  onToggleBarcodeScanner: () => void
+  barcodeScannerSlot: React.ReactNode
+  priceRaw: string
+  onPriceRawChange: (rawDigits: string) => void
+  isEditing: boolean
 }) {
   return (
     <div className="grid gap-4">
@@ -37,23 +54,46 @@ function ProductFormFields({
           onChange={(e) => onChange({ ...value, name: e.target.value })}
           placeholder="VD: Gấu bông nhỏ"
           aria-invalid={Boolean(errors.name)}
+          className="h-11 rounded-xl"
         />
         {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor="barcode">Barcode</Label>
-        <Input
-          id="barcode"
-          value={value.barcode}
-          onChange={(e) => onChange({ ...value, barcode: e.target.value })}
-          placeholder="VD: 893..."
-          inputMode="numeric"
-          aria-invalid={Boolean(errors.barcode)}
-        />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={onToggleBarcodeScanner}
+            className={cn(
+              'absolute right-1.5 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition',
+              'hover:bg-muted/80 hover:text-foreground',
+              'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              barcodeScannerOpen && 'bg-muted/60 text-foreground',
+            )}
+            aria-label={
+              barcodeScannerOpen ? 'Đóng camera quét barcode' : 'Mở camera quét barcode'
+            }
+            title={
+              barcodeScannerOpen ? 'Đóng camera' : 'Quét barcode bằng camera'
+            }
+          >
+            <ScanLine className="size-4" aria-hidden />
+          </button>
+          <Input
+            id="barcode"
+            value={value.barcode}
+            onChange={(e) => onChange({ ...value, barcode: e.target.value })}
+            placeholder="VD: 893..."
+            inputMode="numeric"
+            aria-invalid={Boolean(errors.barcode)}
+            className="h-11 rounded-xl pr-12"
+          />
+        </div>
         {errors.barcode && (
           <div className="text-sm text-destructive">{errors.barcode}</div>
         )}
+        {barcodeScannerSlot}
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
@@ -61,47 +101,43 @@ function ProductFormFields({
           <Label htmlFor="price">Giá bán (VND)</Label>
           <Input
             id="price"
-            value={String(value.price)}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/[^\d]/g, '')
-              const next = raw === '' ? 0 : Number(raw)
-              onChange({ ...value, price: Number.isFinite(next) ? next : 0 })
-            }}
+            type="tel"
             inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="off"
+            spellCheck={false}
+            value={priceRaw === '' ? '' : formatThousandsComma(priceRaw)}
+            onChange={(e) => {
+              onPriceRawChange(stripLeadingZeros(digitsOnly(e.target.value)))
+            }}
             placeholder="59000"
             aria-invalid={Boolean(errors.price)}
+            className="h-11 rounded-xl tabular-nums"
+            onBlur={(e) => {
+              const digits = digitsOnly(e.currentTarget.value)
+              if (digits === '') onPriceRawChange('0')
+            }}
           />
           {errors.price && <div className="text-sm text-destructive">{errors.price}</div>}
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="status">Trạng thái</Label>
-          <select
-            id="status"
-            className={cn(
-              'h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs',
-              'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-            )}
-            value={value.status}
-            onChange={(e) => onChange({ ...value, status: e.target.value as ProductStatus })}
-          >
-            <option value="ACTIVE">Đang bán</option>
-            <option value="INACTIVE">Tạm ngưng</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/10 px-3 py-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium">Tạo tự động</div>
-          <div className="text-xs text-muted-foreground">
-            Đánh dấu sản phẩm được tạo từ scan/import
+        {isEditing && (
+          <div className="grid gap-2">
+            <Label htmlFor="status">Trạng thái</Label>
+            <select
+              id="status"
+              className={cn(
+                'h-11 w-full rounded-xl border border-input bg-transparent px-3 text-base shadow-xs',
+                'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              )}
+              value={value.status}
+              onChange={(e) => onChange({ ...value, status: e.target.value as ProductStatus })}
+            >
+              <option value="ACTIVE">Đang bán</option>
+              <option value="INACTIVE">Tạm ngưng</option>
+            </select>
           </div>
-        </div>
-        <Switch
-          checked={value.isAutoCreated}
-          onCheckedChange={(checked) => onChange({ ...value, isAutoCreated: checked })}
-        />
+        )}
       </div>
     </div>
   )
@@ -147,6 +183,33 @@ export function ProductFormModal({
   const [formErrors, setFormErrors] = React.useState<
     Partial<Record<keyof CreateProductInput, string>>
   >({})
+  const [priceRaw, setPriceRaw] = React.useState<string>('0')
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = React.useState(false)
+  const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
+  const scannerSettings = useScannerSettings()
+
+  const onPriceRawChange = React.useCallback((rawDigits: string) => {
+    const d = rawDigits === '' ? '' : stripLeadingZeros(digitsOnly(rawDigits))
+    setPriceRaw(d)
+    const n = d === '' ? 0 : Number(d)
+    setFormValue((prev) => ({ ...prev, price: Number.isFinite(n) ? n : 0 }))
+  }, [])
+
+  const toggleBarcodeScanner = React.useCallback(() => {
+    if (barcodeScannerOpen) {
+      setBarcodeScannerOpen(false)
+      stopAllVideoStreamsUnderRoot()
+      return
+    }
+    stopAllVideoStreamsUnderRoot()
+    window.requestAnimationFrame(() => setBarcodeScannerOpen(true))
+  }, [barcodeScannerOpen])
+
+  const handleBarcodeScan = React.useCallback(async (code: string) => {
+    setFormValue((prev) => ({ ...prev, barcode: code }))
+    setBarcodeScannerOpen(false)
+    stopAllVideoStreamsUnderRoot()
+  }, [])
 
   React.useEffect(() => {
     if (!open) return
@@ -158,11 +221,21 @@ export function ProductFormModal({
         status: editing.status,
         isAutoCreated: editing.isAutoCreated,
       })
+      setPriceRaw(String(Math.max(0, Math.floor(Number(editing.price)))))
     } else {
       setFormValue(emptyForm)
+      setPriceRaw('0')
     }
     setFormErrors({})
+    setBarcodeScannerOpen(false)
   }, [open, editing])
+
+  React.useEffect(() => {
+    if (!open) {
+      setBarcodeScannerOpen(false)
+      stopAllVideoStreamsUnderRoot()
+    }
+  }, [open])
 
   const closeForm = () => {
     onOpenChange(false)
@@ -198,20 +271,46 @@ export function ProductFormModal({
         if (!o) closeForm()
       }}
       title={editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
-      description="1 barcode = 1 sản phẩm."
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={closeForm}>
+          <Button
+            variant="outline"
+            onClick={closeForm}
+            className="h-11 rounded-xl px-5 text-base sm:px-6"
+          >
             Huỷ
           </Button>
-          <Button onClick={() => void submitForm()}>
+          <Button
+            onClick={() => void submitForm()}
+            className="h-11 rounded-xl px-5 text-base sm:px-6"
+          >
             {editing ? 'Lưu thay đổi' : 'Tạo sản phẩm'}
           </Button>
         </div>
       }
       size="lg"
     >
-      <ProductFormFields value={formValue} onChange={setFormValue} errors={formErrors} />
+      <ProductFormFields
+        value={formValue}
+        onChange={setFormValue}
+        errors={formErrors}
+        barcodeScannerOpen={barcodeScannerOpen}
+        onToggleBarcodeScanner={toggleBarcodeScanner}
+        priceRaw={priceRaw}
+        onPriceRawChange={onPriceRawChange}
+        isEditing={Boolean(editing)}
+        barcodeScannerSlot={
+          barcodeScannerOpen ? (
+            <EmbeddedBarcodeScannerSection
+              layout="embedded"
+              onScan={handleBarcodeScan}
+              settings={scannerSettings}
+              scannerMode={scannerMode}
+              onScannerModeChange={setScannerMode}
+            />
+          ) : null
+        }
+      />
     </Modal>
   )
 }

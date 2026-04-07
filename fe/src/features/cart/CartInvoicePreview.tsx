@@ -2,6 +2,7 @@ import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
 import { useCartStore } from '@/features/cart/cart-store'
 import { cartLinesFromProducts, effectiveUnitFromDraft } from '@/features/cart/cart-lines'
 import { orderService, type OrderItemCreate } from '@/services/orderService'
@@ -10,6 +11,7 @@ import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/pri
 import { ArrowLeft, ReceiptText, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Separator } from '@/components/ui/separator'
+import type { Order } from '@/types/pos'
 
 type PreviewLine = {
   productId: number
@@ -69,6 +71,10 @@ export default function CartInvoicePreview() {
   )
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [customerModalOpen, setCustomerModalOpen] = React.useState(false)
+  const [createdOrder, setCreatedOrder] = React.useState<Order | null>(null)
+  const [customerName, setCustomerName] = React.useState('')
+  const [savingCustomerName, setSavingCustomerName] = React.useState(false)
 
   const linesRef = React.useRef(lines)
   React.useEffect(() => {
@@ -169,13 +175,15 @@ export default function CartInvoicePreview() {
         quantity: Math.max(1, Math.floor(parsePositiveInt(line.quantityRaw, 1))),
         unitPrice: parsePositiveInt(line.unitPriceRaw, 0),
       }))
-      await orderService.create({
+      const created = await orderService.create({
         paymentMethod: null,
         status: 'PENDING',
         items,
       })
       clearCart()
-      navigate('/orders')
+      setCreatedOrder(created)
+      setCustomerName('')
+      setCustomerModalOpen(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể tạo hoá đơn.')
     } finally {
@@ -418,6 +426,72 @@ export default function CartInvoicePreview() {
           aria-hidden
         />
       </footer>
+
+      <Modal
+        open={customerModalOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setCustomerModalOpen(false)
+            setCreatedOrder(null)
+            navigate('/orders')
+          }
+        }}
+        title="Tên khách hàng (tuỳ chọn)"
+        description="Bạn có thể nhập ngay bây giờ hoặc bỏ qua."
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCustomerModalOpen(false)
+                setCreatedOrder(null)
+                navigate('/orders')
+              }}
+              className="h-11 rounded-xl px-5 text-base sm:px-6"
+              disabled={savingCustomerName}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!createdOrder) {
+                  setCustomerModalOpen(false)
+                  navigate('/orders')
+                  return
+                }
+                setSavingCustomerName(true)
+                try {
+                  const name = customerName.trim()
+                  await orderService.updateCustomerName(createdOrder.id, name === '' ? null : name)
+                } finally {
+                  setSavingCustomerName(false)
+                  setCustomerModalOpen(false)
+                  setCreatedOrder(null)
+                  navigate('/orders')
+                }
+              }}
+              className="h-11 rounded-xl px-5 text-base sm:px-6"
+              disabled={savingCustomerName}
+            >
+              Lưu tên
+            </Button>
+          </div>
+        }
+        size="sm"
+      >
+        <div className="grid gap-2">
+          <Input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="VD: Nguyễn Văn A"
+            className="h-11 rounded-xl"
+            autoFocus
+          />
+          <div className="text-xs text-muted-foreground">
+            Để trống nếu khách không cung cấp tên.
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

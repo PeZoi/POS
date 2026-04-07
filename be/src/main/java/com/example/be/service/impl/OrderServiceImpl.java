@@ -7,12 +7,14 @@ import com.example.be.dto.response.order.OrderResponse;
 import com.example.be.entity.OrderEntity;
 import com.example.be.entity.OrderItemEntity;
 import com.example.be.entity.ProductEntity;
+import com.example.be.enums.OrderStatus;
 import com.example.be.exception.NotFoundException;
 import com.example.be.mapper.OrderMapper;
 import com.example.be.repository.OrderRepository;
 import com.example.be.repository.ProductRepository;
 import com.example.be.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,25 @@ public class OrderServiceImpl implements OrderService {
                 .stream()
                 .sorted(Comparator.comparing(OrderEntity::getId).reversed())
                 .map(o -> OrderMapper.toResponse(orderRepository.findWithItemsById(o.getId()).orElse(o)))
+                .toList();
+    }
+
+    @Override
+    public List<OrderResponse> search(String q, OrderStatus status, int limit) {
+        String query = q == null ? "" : q.trim();
+        Long id = null;
+        if (query.matches("\\d+")) {
+            try {
+                id = Long.parseLong(query);
+            } catch (NumberFormatException ignored) {
+                id = null;
+            }
+        }
+
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        return orderRepository.searchWithItems(query, id, status, PageRequest.of(0, safeLimit))
+                .stream()
+                .map(OrderMapper::toResponse)
                 .toList();
     }
 
@@ -73,6 +94,21 @@ public class OrderServiceImpl implements OrderService {
 
         order.getItems().clear();
         applyItems(order, request.items());
+
+        OrderEntity saved = orderRepository.save(order);
+        OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
+        return OrderMapper.toResponse(full);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateCustomerName(Long id, String customerName) {
+        OrderEntity order = orderRepository.findWithItemsById(id)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + id));
+
+        String name = customerName == null ? null : customerName.trim();
+        if (name != null && name.isBlank()) name = null;
+        order.setCustomerName(name);
 
         OrderEntity saved = orderRepository.save(order);
         OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);

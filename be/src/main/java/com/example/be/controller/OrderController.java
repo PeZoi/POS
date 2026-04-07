@@ -2,6 +2,7 @@ package com.example.be.controller;
 
 import com.example.be.common.response.ApiResponse;
 import com.example.be.dto.request.order.OrderCreateRequest;
+import com.example.be.dto.request.order.OrderCustomerNameRequest;
 import com.example.be.dto.request.order.OrderUpdateRequest;
 import com.example.be.dto.response.order.OrderResponse;
 import com.example.be.service.OrderService;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.be.enums.OrderStatus;
 import java.util.List;
 
 @RestController
@@ -26,6 +28,25 @@ public class OrderController {
     @Operation(summary = "List orders", description = "Get all orders with items (no pagination).")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(orderService.list()));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search orders", description = "Search by orderCode contains or id equals. Optional status filter.")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> search(
+            @RequestParam(name = "q", required = false, defaultValue = "") String q,
+            @RequestParam(name = "status", required = false) OrderStatus status,
+            @RequestParam(name = "limit", required = false, defaultValue = "50") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.search(q, status, limit)));
+    }
+
+    @PatchMapping("/{id}/customer-name")
+    @Operation(summary = "Update order customer name", description = "Set customerName for an order (nullable/blank allowed).")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateCustomerName(
+            @PathVariable Long id,
+            @RequestBody OrderCustomerNameRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.updated(orderService.updateCustomerName(id, request.customerName())));
     }
 
     @GetMapping("/{id}")

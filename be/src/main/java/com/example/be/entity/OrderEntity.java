@@ -34,6 +34,9 @@ public class OrderEntity {
     @Column(length = 20)
     private OrderStatus status;
 
+    @Column(name = "customer_name", length = 120)
+    private String customerName;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

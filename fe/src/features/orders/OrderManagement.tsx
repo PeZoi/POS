@@ -13,6 +13,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { OrderSearch } from '@/features/orders/components/OrderSearch'
 
 type StatusFilter = 'ALL' | OrderStatus
 
@@ -221,7 +222,13 @@ export function OrderManagement() {
   const { items: products, loading: productsLoading, error: productsError } = useProducts()
 
   const [query, setQuery] = React.useState('')
+  const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ALL')
+  const [visibleCount, setVisibleCount] = React.useState(50)
+  const loadMoreRef = React.useRef<HTMLDivElement | null>(null)
+  const [searchLoading, setSearchLoading] = React.useState(false)
+  const [searchError, setSearchError] = React.useState<string | null>(null)
+  const [searchResults, setSearchResults] = React.useState<Order[] | null>(null)
 
   const [editing, setEditing] = React.useState<Order | null>(null)
   const [formOpen, setFormOpen] = React.useState(false)
@@ -234,8 +241,11 @@ export function OrderManagement() {
   >({})
 
   const filtered = React.useMemo(() => {
-    const q = normalize(query)
-    return orders.filter((o) => {
+    const base: Order[] =
+      debouncedQuery && searchResults !== null ? searchResults : orders
+    const q = normalize(debouncedQuery)
+
+    return base.filter((o) => {
       const matchStatus = statusFilter === 'ALL' ? true : o.status === statusFilter
       const matchQuery =
         q.length === 0
@@ -243,7 +253,37 @@ export function OrderManagement() {
           : String(o.orderCode ?? '').includes(q) || String(o.id).includes(q)
       return matchStatus && matchQuery
     })
-  }, [orders, query, statusFilter])
+  }, [orders, debouncedQuery, statusFilter, searchResults])
+
+  const visible = React.useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  )
+
+  React.useEffect(() => {
+    setVisibleCount(50)
+  }, [query, statusFilter, orders.length])
+
+  React.useEffect(() => {
+    const el = loadMoreRef.current
+    if (!el) return
+
+    if (visible.length >= filtered.length) return
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev >= filtered.length) return prev
+            return Math.min(prev + 50, filtered.length)
+          })
+        }
+      }
+    })
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [filtered.length, visible.length])
 
   const openCreate = () => {
     setEditing(null)
@@ -306,30 +346,47 @@ export function OrderManagement() {
           <div className="text-lg font-semibold leading-tight sm:text-xl">Quản lý hoá đơn</div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={openCreate} className="w-full sm:w-auto">
+          <Button
+            onClick={openCreate}
+            size="lg"
+            className="w-full sm:w-auto rounded-xl px-5 text-base"
+          >
             <Plus className="mr-1.5 size-4" />
             Tạo hoá đơn
           </Button>
-          <Button variant="outline" onClick={() => void reload()} className="w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => void reload()}
+            size="lg"
+            className="w-full sm:w-auto rounded-xl px-5 text-base"
+          >
             Tải lại
           </Button>
         </div>
       </div>
 
-      {(error || productsError) && (
+      {(error || productsError || searchError) && (
         <div className="rounded-2xl border bg-destructive/5 p-3 text-sm text-destructive">
-          {error ?? productsError}
+          {error ?? productsError ?? searchError}
         </div>
       )}
 
       <div className="grid gap-2 sm:grid-cols-[1fr_220px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+          <OrderSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo mã hoá đơn…"
-            className="pl-9"
+            onValueChange={setQuery}
+            status={statusFilter}
+            limit={80}
+            debounceMs={320}
+            inputClassName="pl-9"
+            onStateChange={(s) => {
+              setDebouncedQuery(s.debouncedQuery)
+              setSearchLoading(s.loading)
+              setSearchError(s.error)
+              setSearchResults(s.debouncedQuery ? s.results : null)
+            }}
           />
         </div>
 
@@ -353,6 +410,7 @@ export function OrderManagement() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[130px]">Mã</TableHead>
+              <TableHead>Khách hàng</TableHead>
               <TableHead className="w-[160px]">Trạng thái</TableHead>
               <TableHead className="w-[140px]">Thanh toán</TableHead>
               <TableHead className="text-right">Tổng tiền</TableHead>
@@ -361,10 +419,15 @@ export function OrderManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((o) => (
+            {visible.map((o) => (
               <TableRow key={o.id}>
                 <TableCell className="font-medium tabular-nums">
-                  {o.orderCode ?? String(o.id)}
+                  #{o.orderCode ?? String(o.id)}
+                </TableCell>
+                <TableCell className="min-w-0">
+                  <span className="block max-w-md truncate text-sm text-foreground">
+                    {o.customerName && o.customerName.trim() !== '' ? o.customerName : '—'}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <Badge variant={statusBadgeVariant(o.status)}>{statusLabel(o.status)}</Badge>
@@ -406,9 +469,9 @@ export function OrderManagement() {
 
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center">
+                <TableCell colSpan={7} className="py-10 text-center">
                   <div className="text-sm text-muted-foreground">
-                    {loading ? 'Đang tải…' : 'Không có hoá đơn phù hợp.'}
+                    {loading || searchLoading ? 'Đang tải…' : 'Không có hoá đơn phù hợp.'}
                   </div>
                   <div className="mt-3">
                     <Button variant="outline" onClick={() => setQuery('')}>
@@ -424,7 +487,7 @@ export function OrderManagement() {
 
       <div className="md:hidden">
         <div className="grid gap-3">
-          {filtered.map((o) => (
+          {visible.map((o) => (
             <Card key={o.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
@@ -446,6 +509,12 @@ export function OrderManagement() {
                   <div className="text-sm text-muted-foreground">Tổng tiền</div>
                   <div className="text-base font-semibold tabular-nums">
                     {formatVnd(o.totalAmount ?? 0)}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="text-sm text-muted-foreground">Khách hàng</div>
+                  <div className="max-w-[70%] truncate text-sm text-muted-foreground">
+                    {o.customerName && o.customerName.trim() !== '' ? o.customerName : '—'}
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
@@ -490,6 +559,13 @@ export function OrderManagement() {
             </Card>
           )}
         </div>
+      </div>
+
+      <div
+        ref={loadMoreRef}
+        className="mt-2 h-8 w-full text-center text-xs text-muted-foreground"
+      >
+        {visible.length < filtered.length && 'Đang tải thêm hoá đơn…'}
       </div>
 
       <Modal
@@ -577,7 +653,6 @@ export function OrderManagement() {
             ? `Chi tiết hoá đơn #${viewTarget.orderCode ?? String(viewTarget.id)}`
             : 'Chi tiết hoá đơn'
         }
-        description="Danh sách order_items từ backend."
         footer={
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => setViewTarget(null)}>
@@ -590,6 +665,14 @@ export function OrderManagement() {
         {viewTarget && (
           <div className="grid gap-3">
             <div className="grid gap-2 rounded-xl border bg-muted/10 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-muted-foreground">Khách hàng</div>
+                <div className="max-w-[70%] truncate text-right">
+                  {viewTarget.customerName && viewTarget.customerName.trim() !== ''
+                    ? viewTarget.customerName
+                    : '—'}
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="text-muted-foreground">Trạng thái</div>
                 <Badge variant={statusBadgeVariant(viewTarget.status)}>

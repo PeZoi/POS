@@ -20,6 +20,7 @@ public class OrderMapper {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderCode(),
+                order.getCustomerName(),
                 order.getTotalAmount(),
                 order.getPaymentMethod(),
                 order.getStatus(),

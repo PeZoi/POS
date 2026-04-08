@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ArrowLeft, CreditCard, ReceiptText, Boxes, History } from 'lucide-react'
+import { ArrowLeft, CreditCard, ReceiptText, Boxes, History, Printer } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -11,6 +11,7 @@ import { ApiError } from '@/services/apiClient'
 import { orderService } from '@/services/orderService'
 import type { Order, OrderPayment, OrderStatus } from '@/types/pos'
 import { OrderPaymentDialog } from '@/features/orders/components/OrderPaymentDialog'
+import { OrderPrintDialog } from '@/features/orders/components/OrderPrintDialog'
 
 function formatVnd(amount: number) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
@@ -76,6 +77,8 @@ export function OrderDetailPage() {
   const [payOpen, setPayOpen] = React.useState(false)
   const [paySubmitting, setPaySubmitting] = React.useState(false)
 
+  const [printOpen, setPrintOpen] = React.useState(false)
+
   const remainingAmount = React.useMemo(() => {
     if (!order) return 0
     const total = Math.max(0, order.totalAmount ?? 0)
@@ -137,6 +140,10 @@ export function OrderDetailPage() {
 
   const openPay = React.useCallback(() => {
     setPayOpen(true)
+  }, [])
+
+  const openPrint = React.useCallback(() => {
+    setPrintOpen(true)
   }, [])
 
   const submitPayment = React.useCallback(async (payload: { amount: number; note: string | null }) => {
@@ -212,17 +219,31 @@ export function OrderDetailPage() {
             </div>
           </div>
 
-          {canPay && (
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               size="sm"
-              onClick={openPay}
-              className="shrink-0 rounded-xl"
-              aria-label="Thanh toán"
+              variant="outline"
+              onClick={openPrint}
+              className="rounded-xl"
+              aria-label="In hoá đơn"
+              disabled={!order || loading}
             >
-              <CreditCard className="mr-1.5 size-4" />
-              <span className="hidden sm:inline">Thanh toán</span>
+              <Printer className="mr-1.5 size-4" />
+              <span className="hidden sm:inline">In hoá đơn</span>
             </Button>
-          )}
+
+            {canPay && (
+              <Button
+                size="sm"
+                onClick={openPay}
+                className="rounded-xl"
+                aria-label="Thanh toán"
+              >
+                <CreditCard className="mr-1.5 size-4" />
+                <span className="hidden sm:inline">Thanh toán</span>
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -366,6 +387,13 @@ export function OrderDetailPage() {
             </TableBody>
           </Table>
         )}
+
+      <OrderPrintDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        order={order}
+        remainingAmount={remainingAmount}
+      />
 
       <OrderPaymentDialog
         open={payOpen}

@@ -19,6 +19,7 @@ import com.example.be.repository.OrderRepository;
 import com.example.be.repository.ProductRepository;
 import com.example.be.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,19 +54,45 @@ public class OrderServiceImpl implements OrderService {
     public List<OrderResponse> search(String q, OrderStatus status, int limit) {
         String query = q == null ? "" : q.trim();
         Long id = null;
+        Integer totalAmountEq = null;
         if (query.matches("\\d+")) {
             try {
-                id = Long.parseLong(query);
+                long n = Long.parseLong(query);
+                id = n;
+                if (n >= 0 && n <= Integer.MAX_VALUE) {
+                    totalAmountEq = (int) n;
+                }
             } catch (NumberFormatException ignored) {
                 id = null;
             }
+        } else {
+            totalAmountEq = parseMoneyAmountFilter(query);
         }
 
         int safeLimit = Math.max(1, Math.min(limit, 200));
-        return orderRepository.searchWithItems(query, id, status, PageRequest.of(0, safeLimit))
+        return orderRepository.searchWithItems(query, id, totalAmountEq, status, PageRequest.of(0, safeLimit))
                 .stream()
                 .map(OrderMapper::toResponse)
                 .toList();
+    }
+
+    /**
+     * Chuỗi chỉ gồm số và dấu phân tách (vd. 50.000, 1 234 567) → lọc theo {@code totalAmount} khớp đúng.
+     */
+    private static Integer parseMoneyAmountFilter(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String t = raw.trim();
+        if (!t.matches("[\\d.,\\s\\u00A0\\u202F]+")) return null;
+        if (t.chars().noneMatch(Character::isDigit)) return null;
+        String digits = t.replaceAll("\\D", "");
+        if (digits.isEmpty()) return null;
+        try {
+            long n = Long.parseLong(digits);
+            if (n >= 0 && n <= Integer.MAX_VALUE) return (int) n;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+        return null;
     }
 
     @Override
@@ -145,19 +172,35 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse create(OrderCreateRequest request) {
-        OrderEntity order = new OrderEntity();
-        order.setOrderCode(generateUniqueOrderCode());
-        order.setStatus(request.status());
-        String name = request.customerName() == null ? null : request.customerName().trim();
-        if (name != null && name.isBlank()) name = null;
-        order.setCustomerName(name);
-        order.setPaidAmount(request.paidAmount());
+        final int maxSaveAttempts = 20;
+        for (int saveAttempt = 0; saveAttempt < maxSaveAttempts; saveAttempt++) {
+            OrderEntity order = new OrderEntity();
+            order.setOrderCode(generateUniqueOrderCode());
+            order.setStatus(request.status());
+            String name = request.customerName() == null ? null : request.customerName().trim();
+            if (name != null && name.isBlank()) name = null;
+            order.setCustomerName(name);
+            order.setPaidAmount(request.paidAmount());
 
-        applyItems(order, request.items());
-        normalizePaidAmount(order);
-        OrderEntity saved = orderRepository.save(order);
-        OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
-        return OrderMapper.toResponse(full);
+            applyItems(order, request.items());
+            normalizePaidAmount(order);
+            try {
+                OrderEntity saved = orderRepository.save(order);
+
+                // Nếu tạo hoá đơn đã có paidAmount (đủ/1 phần) thì phải có 1 dòng lịch sử thanh toán tương ứng.
+                seedPaymentHistoryIfMissing(saved);
+
+                OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
+                return OrderMapper.toResponse(full);
+            } catch (DataIntegrityViolationException e) {
+                // Trùng mã hoá đơn (đa luồng / hiếm) — random lại 3 số cuối và thử lưu tiếp
+                if (saveAttempt == maxSaveAttempts - 1) {
+                    throw new BadRequestException(
+                            "Không thể tạo mã hoá đơn duy nhất sau nhiều lần thử. Vui lòng thử lại.");
+                }
+            }
+        }
+        throw new BadRequestException("Không thể tạo hoá đơn.");
     }
 
     @Override
@@ -177,6 +220,10 @@ public class OrderServiceImpl implements OrderService {
         normalizePaidAmount(order);
 
         OrderEntity saved = orderRepository.save(order);
+
+        // Nếu hệ thống/FE cập nhật paidAmount trực tiếp (hoá đơn cũ), đảm bảo có lịch sử thanh toán (backfill 1 dòng).
+        seedPaymentHistoryIfMissing(saved);
+
         OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
         return OrderMapper.toResponse(full);
     }
@@ -204,6 +251,22 @@ public class OrderServiceImpl implements OrderService {
         int t = Math.max(0, total);
         if (p > t) p = t;
         order.setPaidAmount(p);
+    }
+
+    private void seedPaymentHistoryIfMissing(OrderEntity order) {
+        if (order == null || order.getId() == null) return;
+        Integer paid = order.getPaidAmount();
+        int paidAmount = paid == null ? 0 : Math.max(0, paid);
+        if (paidAmount <= 0) return;
+        if (orderPaymentRepository.existsByOrderId(order.getId())) return;
+
+        OrderPaymentEntity seed = new OrderPaymentEntity();
+        seed.setOrder(order);
+        seed.setAmount(paidAmount);
+        seed.setNote(paidAmount >= Math.max(0, order.getTotalAmount() == null ? 0 : order.getTotalAmount())
+                ? "Thanh toán đủ khi tạo/cập nhật hoá đơn"
+                : "Thanh toán một phần khi tạo/cập nhật hoá đơn");
+        orderPaymentRepository.save(seed);
     }
 
     @Override
@@ -242,19 +305,28 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Format: ddMMyy + 3 số random (000-999), ví dụ 070426123.
-     * Có kiểm tra trùng để tránh collision (hiếm).
+     * Format: ddMMyy + 3 chữ số ngẫu nhiên (000–999), ví dụ 080426137.
+     * Random lại 3 số cuối cho đến khi {@code existsByOrderCode} báo chưa có (lặp đủ lớn để xử lý nhiều đơn/ngày).
+     * Nếu vùng 3 số quá đông: thử hậu tố 4 chữ số.
      */
     private String generateUniqueOrderCode() {
         String prefix = LocalDate.now().format(ORDER_CODE_DATE);
-        for (int i = 0; i < 25; i++) {
+        final int maxThreeDigitTries = 2000;
+        for (int i = 0; i < maxThreeDigitTries; i++) {
             int suffix = RAND.nextInt(1000);
             String code = prefix + String.format("%03d", suffix);
-            if (!orderRepository.existsByOrderCode(code)) return code;
+            if (!orderRepository.existsByOrderCode(code)) {
+                return code;
+            }
         }
-        // fallback cực hiếm: dùng 4 số (vẫn giữ prefix ddMMyy) để tránh fail request
-        int suffix = RAND.nextInt(10_000);
-        return prefix + String.format("%04d", suffix);
+        for (int i = 0; i < 200; i++) {
+            int suffix = RAND.nextInt(10_000);
+            String code = prefix + String.format("%04d", suffix);
+            if (!orderRepository.existsByOrderCode(code)) {
+                return code;
+            }
+        }
+        throw new BadRequestException("Không tạo được mã hoá đơn không trùng (đã thử nhiều lần).");
     }
 }
 

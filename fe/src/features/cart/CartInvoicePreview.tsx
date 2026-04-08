@@ -14,6 +14,7 @@ import {
   CheckoutInfoModal,
   type CheckoutPaymentState,
 } from '@/features/cart/components/CheckoutInfoModal'
+import { toast } from 'sonner'
 
 type PreviewLine = {
   productId: number
@@ -77,7 +78,7 @@ export default function CartInvoicePreview() {
   const [customerName, setCustomerName] = React.useState('')
   const [paymentState, setPaymentState] = React.useState<
     'UNPAID' | 'PARTIALLY_PAID' | 'PAID'
-  >('UNPAID')
+  >('PAID')
   const [paidAmountRaw, setPaidAmountRaw] = React.useState('')
 
   const linesRef = React.useRef(lines)
@@ -136,8 +137,11 @@ export default function CartInvoicePreview() {
     )
   }, [])
 
+  const initialRedirectDoneRef = React.useRef(false)
   React.useEffect(() => {
-    // Nếu mở preview mà không có giỏ → quay lại.
+    // Chỉ check EMPTY CART đúng 1 lần lúc vừa vào trang preview.
+    if (initialRedirectDoneRef.current) return
+    initialRedirectDoneRef.current = true
     if (products.length === 0) {
       navigate('/cart', { replace: true })
     }
@@ -211,7 +215,7 @@ export default function CartInvoicePreview() {
             ? Math.max(0, Math.floor(total))
             : safePaidAmount
 
-      await orderService.create({
+      const created = await orderService.create({
         status,
         customerName: customerNameOrNull,
         paidAmount: paidAmountToSend,
@@ -220,7 +224,16 @@ export default function CartInvoicePreview() {
 
       clearCart()
       setCheckoutModalOpen(false)
-      navigate('/orders')
+      toast.success('Tạo hoá đơn thành công', {
+        description:
+          status === 'PAID'
+            ? 'Hoá đơn đã thanh toán đủ.'
+            : status === 'PARTIALLY_PAID'
+              ? 'Hoá đơn đã thanh toán một phần.'
+              : 'Hoá đơn đang chờ thanh toán.',
+      })
+      // Dùng replace để không còn bước /cart/preview trong history (tránh back/swap quay lại ngay trên mobile).
+      navigate(`/orders/${created.id}`, { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể tạo hoá đơn.')
     } finally {

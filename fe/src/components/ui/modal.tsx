@@ -48,13 +48,13 @@ export function Modal({
 
   const contentRef = React.useRef<HTMLDivElement | null>(null)
 
-  if (!open || !mounted) return null
-
   const isOutsideContent = React.useCallback((target: EventTarget | null) => {
     const content = contentRef.current
     if (!content || !target || !(target instanceof Node)) return false
     return !content.contains(target)
   }, [])
+
+  if (!open || !mounted) return null
 
   return createPortal(
     <div

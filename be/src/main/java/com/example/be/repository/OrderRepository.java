@@ -26,12 +26,15 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
                     or :q = ''
                     or lower(o.orderCode) like lower(concat('%', :q, '%'))
                     or (:id is not null and o.id = :id)
+                    or (:totalAmountEq is not null and o.totalAmount = :totalAmountEq)
+                    or (o.customerName is not null and lower(o.customerName) like lower(concat('%', :q, '%')))
                   )
             order by o.id desc
             """)
     List<OrderEntity> searchWithItems(
             @Param("q") String q,
             @Param("id") Long id,
+            @Param("totalAmountEq") Integer totalAmountEq,
             @Param("status") OrderStatus status,
             Pageable pageable
     );

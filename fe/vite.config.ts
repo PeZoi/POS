@@ -8,12 +8,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { serwist } from '@serwist/vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, path.dirname(fileURLToPath(import.meta.url)), '')
   const pyBarcodePort = env.PY_BARCODE_PORT || '8765'
   /** Bật bằng `npm run dev:https` hoặc `DEV_HTTPS=true` — cần cho camera (getUserMedia) khi mở qua IP LAN. */
   const useHttps =
     process.env.DEV_HTTPS === 'true' || env.DEV_HTTPS === 'true'
+  const enablePwa = command === 'build'
 
   return {
   resolve: {
@@ -26,19 +27,17 @@ export default defineConfig(({ mode }) => {
     ...(useHttps ? [basicSsl()] : []),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
-    serwist({
-      swSrc: 'src/sw.ts',
-      swDest: 'sw.js',
-      globDirectory: 'dist',
-      injectionPoint: 'self.__SW_MANIFEST',
-      rollupFormat: 'iife',
-      // Dev: cần HTTPS/localhost để SW hoạt động.
-      devOptions: {
-        // Keep defaults; avoid bundling/minify changes unless needed.
-        bundle: false,
-        minify: false,
-      },
-    }),
+    ...(enablePwa
+      ? [
+          serwist({
+            swSrc: 'src/sw.ts',
+            swDest: 'sw.js',
+            globDirectory: 'dist',
+            injectionPoint: 'self.__SW_MANIFEST',
+            rollupFormat: 'iife',
+          }),
+        ]
+      : []),
   ],
   server: {
     host: true,

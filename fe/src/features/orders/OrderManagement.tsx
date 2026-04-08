@@ -1,10 +1,11 @@
 import * as React from 'react'
 import { Plus, Search, Pencil, Eye, CreditCard } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-import type { Order, OrderPayment, OrderStatus, Product } from '@/types/pos'
+import type { Order, OrderStatus, Product } from '@/types/pos'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useProducts } from '@/features/products/hooks/useProducts'
-import { orderService, type CreateOrderInput, type CreateOrderPaymentInput } from '@/services/orderService'
+import { orderService, type CreateOrderInput } from '@/services/orderService'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { OrderSearch } from '@/features/orders/components/OrderSearch'
 import { ApiError } from '@/services/apiClient'
-import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
+import { toast } from 'sonner'
+import { OrderPaymentDialog } from '@/features/orders/components/OrderPaymentDialog'
 
 type StatusFilter = 'ALL' | OrderStatus
 
@@ -190,6 +192,7 @@ function OrderForm({
 }
 
 export function OrderManagement() {
+  const navigate = useNavigate()
   const {
     items: orders,
     loading,
@@ -197,7 +200,6 @@ export function OrderManagement() {
     create,
     update,
     reload,
-    getById,
   } = useOrders()
   const { items: products, loading: productsLoading, error: productsError } = useProducts()
 
@@ -212,19 +214,9 @@ export function OrderManagement() {
 
   const [editing, setEditing] = React.useState<Order | null>(null)
   const [formOpen, setFormOpen] = React.useState(false)
-  const [viewTarget, setViewTarget] = React.useState<Order | null>(null)
-  const [viewTab, setViewTab] = React.useState<'products' | 'payments'>('products')
 
-  const [payments, setPayments] = React.useState<OrderPayment[] | null>(null)
-  const [paymentsLoading, setPaymentsLoading] = React.useState(false)
-  const [paymentsError, setPaymentsError] = React.useState<string | null>(null)
-
+  const [payTarget, setPayTarget] = React.useState<Order | null>(null)
   const [payOpen, setPayOpen] = React.useState(false)
-  const [payValue, setPayValue] = React.useState<CreateOrderPaymentInput>({
-    amount: 0,
-    note: null,
-  })
-  const [payAmountRaw, setPayAmountRaw] = React.useState('0')
   const [paySubmitting, setPaySubmitting] = React.useState(false)
 
   const [formValue, setFormValue] = React.useState<OrderFormValue>(emptyForm)
@@ -236,13 +228,20 @@ export function OrderManagement() {
     const base: Order[] =
       debouncedQuery && searchResults !== null ? searchResults : orders
     const q = normalize(debouncedQuery)
+    /** Kết quả đã lọc từ API — không lọc lại theo mã/id (tránh mất kết quả tìm theo tên khách / tổng tiền). */
+    const trustServerResults = Boolean(debouncedQuery && searchResults !== null)
 
     return base.filter((o) => {
       const matchStatus = statusFilter === 'ALL' ? true : o.status === statusFilter
       const matchQuery =
         q.length === 0
           ? true
-          : String(o.orderCode ?? '').includes(q) || String(o.id).includes(q)
+          : trustServerResults
+            ? true
+            : String(o.orderCode ?? '').includes(q) ||
+              String(o.id).includes(q) ||
+              normalize(o.customerName ?? '').includes(q) ||
+              String(o.totalAmount ?? '') === q
       return matchStatus && matchQuery
     })
   }, [orders, debouncedQuery, statusFilter, searchResults])
@@ -323,88 +322,41 @@ export function OrderManagement() {
     setFormOpen(false)
   }
 
-  const canPay = React.useMemo(() => {
-    if (!viewTarget) return false
-    return viewTarget.status === 'PENDING' || viewTarget.status === 'PARTIALLY_PAID'
-  }, [viewTarget])
-
-  const remainingAmount = React.useMemo(() => {
-    if (!viewTarget) return 0
-    const total = Math.max(0, viewTarget.totalAmount ?? 0)
-    const paid = Math.max(0, viewTarget.paidAmount ?? 0)
-    return Math.max(0, total - paid)
-  }, [viewTarget])
-
-  const loadPayments = React.useCallback(
-    async (orderId: number) => {
-      setPaymentsLoading(true)
-      setPaymentsError(null)
-      try {
-        const data = await orderService.listPayments(orderId)
-        setPayments(data)
-      } catch (e) {
-        setPaymentsError(e instanceof Error ? e.message : 'Không thể tải lịch sử thanh toán.')
-      } finally {
-        setPaymentsLoading(false)
-      }
-    },
-    [],
-  )
-
-  const openPaymentModal = React.useCallback(() => {
-    if (!viewTarget) return
-    setPayValue({ amount: remainingAmount, note: null })
-    setPayAmountRaw(String(Math.max(0, Math.floor(remainingAmount))))
+  const openPayFromList = React.useCallback((o: Order) => {
+    setPayTarget(o)
     setPayOpen(true)
-  }, [remainingAmount, viewTarget])
+  }, [])
 
-  const openPaymentFromList = React.useCallback(
-    async (orderId: number) => {
-      const full = await getById(orderId)
-      setViewTarget(full)
-      setViewTab('products')
-      setPayments(null)
-      setPaymentsError(null)
-      const remain = Math.max(0, (full.totalAmount ?? 0) - (full.paidAmount ?? 0))
-      setPayValue({ amount: remain, note: null })
-      setPayAmountRaw(String(Math.max(0, Math.floor(remain))))
-      setPayOpen(true)
-    },
-    [getById],
-  )
+  const submitPayment = React.useCallback(async (payload: { amount: number; note: string | null }) => {
+    if (!payTarget) return
+    const total = Math.max(0, payTarget.totalAmount ?? 0)
+    const paid = Math.max(0, payTarget.paidAmount ?? 0)
+    const remain = Math.max(0, total - paid)
+    const amount = payload.amount
 
-  const submitPayment = React.useCallback(async () => {
-    if (!viewTarget) return
-    const digits = stripLeadingZeros(digitsOnly(payAmountRaw))
-    const amount = digits.length ? Number(digits) : 0
     if (amount < 1) {
       globalThis.alert?.('Số tiền thanh toán phải >= 1.')
       return
     }
-    if (amount > remainingAmount) {
-      globalThis.alert?.(`Số tiền thanh toán vượt quá số tiền còn lại: ${formatVnd(remainingAmount)}`)
+    if (amount > remain) {
+      globalThis.alert?.(`Số tiền thanh toán vượt quá số tiền còn lại: ${formatVnd(remain)}`)
       return
     }
 
     setPaySubmitting(true)
     try {
-      const updated = await orderService.addPayment(viewTarget.id, {
-        amount,
-        note: payValue.note ?? null,
-      })
-      setViewTarget(updated)
+      await orderService.addPayment(payTarget.id, { amount, note: payload.note ?? null })
+      toast.success('Thanh toán thành công', { description: `Đã ghi nhận ${formatVnd(amount)}` })
       setPayOpen(false)
-      setPayAmountRaw('0')
-      await loadPayments(viewTarget.id)
+      setPayTarget(null)
       await reload()
     } catch (e) {
-      const msg =
-        e instanceof ApiError || e instanceof Error ? e.message : 'Không thể ghi nhận thanh toán.'
+      const msg = e instanceof ApiError || e instanceof Error ? e.message : 'Không thể ghi nhận thanh toán.'
       globalThis.alert?.(msg)
     } finally {
       setPaySubmitting(false)
     }
-  }, [loadPayments, payAmountRaw, payValue.note, reload, remainingAmount, viewTarget])
+  }, [payTarget, reload])
 
   return (
     <div className="grid gap-4 md:gap-6">
@@ -420,14 +372,6 @@ export function OrderManagement() {
           >
             <Plus className="mr-1.5 size-4" />
             Tạo hoá đơn
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => void reload()}
-            size="lg"
-            className="w-full sm:w-auto rounded-xl px-5 text-base"
-          >
-            Tải lại
           </Button>
         </div>
       </div>
@@ -510,37 +454,35 @@ export function OrderManagement() {
                   {formatCreatedAt(o.createdAt)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="inline-flex gap-2">
+                  <div className="inline-flex flex-col items-end gap-2">
+                    <div className="flex w-full justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/orders/${o.id}`)}
+                      >
+                        <Eye className="mr-1.5 size-4" />
+                        Xem
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(o)}>
+                        <Pencil className="mr-1.5 size-4" />
+                        Sửa
+                      </Button>
+                    </div>
+
                     {(o.status === 'PENDING' || o.status === 'PARTIALLY_PAID') && (
                       <Button
                         variant="default"
                         size="sm"
+                        className="w-full"
                         onClick={() => {
-                          void openPaymentFromList(o.id)
+                          openPayFromList(o)
                         }}
                       >
                         <CreditCard className="mr-1.5 size-4" />
                         Thanh toán
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        const full = await getById(o.id)
-                        setViewTarget(full)
-                        setViewTab('products')
-                        setPayments(null)
-                        setPaymentsError(null)
-                      }}
-                    >
-                      <Eye className="mr-1.5 size-4" />
-                      Xem
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => openEdit(o)}>
-                      <Pencil className="mr-1.5 size-4" />
-                      Sửa
-                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -603,12 +545,13 @@ export function OrderManagement() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="justify-end">
+              <CardFooter className="flex flex-row gap-2">
                 {(o.status === 'PENDING' || o.status === 'PARTIALLY_PAID') && (
                   <Button
                     size="sm"
+                    className="flex-1"
                     onClick={() => {
-                      void openPaymentFromList(o.id)
+                      openPayFromList(o)
                     }}
                   >
                     <CreditCard className="mr-1.5 size-4" />
@@ -618,18 +561,18 @@ export function OrderManagement() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
-                    const full = await getById(o.id)
-                    setViewTarget(full)
-                    setViewTab('products')
-                    setPayments(null)
-                    setPaymentsError(null)
-                  }}
+                  className="flex-1"
+                  onClick={() => navigate(`/orders/${o.id}`)}
                 >
                   <Eye className="mr-1.5 size-4" />
                   Xem
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => openEdit(o)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => openEdit(o)}
+                >
                   <Pencil className="mr-1.5 size-4" />
                   Sửa
                 </Button>
@@ -664,14 +607,13 @@ export function OrderManagement() {
         onOpenChange={(o) => {
           if (!o) closeForm()
         }}
-        title={editing ? `Sửa hoá đơn #${editing.id}` : 'Tạo hoá đơn'}
-        description="Tạo/Update sẽ gọi backend thật."
+        title={editing ? `Sửa hoá đơn #${editing?.orderCode ?? String(editing?.id)}` : 'Tạo hoá đơn'}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={closeForm}>
               Huỷ
             </Button>
-            <Button onClick={submitForm}>{editing ? 'Lưu thay đổi' : 'Tạo hoá đơn'}</Button>
+            <Button onClick={submitForm}>{editing ? 'Cập nhật' : 'Tạo hoá đơn'}</Button>
           </div>
         }
         size="lg"
@@ -687,247 +629,34 @@ export function OrderManagement() {
         )}
       </Modal>
 
-      <Modal
-        open={Boolean(viewTarget)}
-        onOpenChange={(o) => {
-          if (!o) setViewTarget(null)
-        }}
-        title={
-          viewTarget
-            ? `Chi tiết hoá đơn #${viewTarget.orderCode ?? String(viewTarget.id)}`
-            : 'Chi tiết hoá đơn'
-        }
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" size="lg" onClick={() => setViewTarget(null)}>
-              Đóng
-            </Button>
-            {canPay && (
-              <Button size="lg" onClick={openPaymentModal}>
-                <CreditCard className="mr-2 size-5" />
-                Thanh toán
-              </Button>
-            )}
-          </div>
-        }
-        size="lg"
-      >
-        {viewTarget && (
-          <div className="grid gap-3">
-            <div className="grid gap-3 rounded-xl border bg-muted/10 p-3 text-sm">
-              <div className="rounded-lg border bg-background/60 p-3">
-                <div className="text-xs font-medium text-muted-foreground">Tổng tiền hoá đơn</div>
-                <div className="mt-1 text-2xl font-extrabold tabular-nums tracking-tight text-primary">
-                  {formatVnd(viewTarget.totalAmount ?? 0)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-muted-foreground">Khách hàng</div>
-                <div className="max-w-[70%] truncate text-right">
-                  {viewTarget.customerName && viewTarget.customerName.trim() !== ''
-                    ? viewTarget.customerName
-                    : '—'}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Trạng thái</div>
-                <Badge variant={statusBadgeVariant(viewTarget.status)}>
-                  {statusLabel(viewTarget.status)}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Đã thanh toán</div>
-                <div className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                  {paidAmountLabel(viewTarget.paidAmount, viewTarget.totalAmount)}
-                </div>
-              </div>
-              {remainingAmount > 0 && (
-                <div className="flex items-center justify-between">
-                  <div className="text-muted-foreground">Còn lại</div>
-                  <div className="font-semibold tabular-nums text-destructive">
-                    {formatVnd(remainingAmount)}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Ngày tạo</div>
-                <div className="tabular-nums">{formatCreatedAt(viewTarget.createdAt)}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={viewTab === 'products' ? 'default' : 'outline'}
-                size="default"
-                onClick={() => setViewTab('products')}
-              >
-                Sản phẩm
-              </Button>
-              <Button
-                type="button"
-                variant={viewTab === 'payments' ? 'default' : 'outline'}
-                size="default"
-                onClick={async () => {
-                  setViewTab('payments')
-                  if (payments == null && !paymentsLoading) await loadPayments(viewTarget.id)
-                }}
-              >
-                Lịch sử thanh toán
-              </Button>
-            </div>
-
-            {viewTab === 'products' ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[90px]">ID</TableHead>
-                    <TableHead>Sản phẩm</TableHead>
-                    <TableHead className="w-[120px] text-right">Giá</TableHead>
-                    <TableHead className="w-[120px] text-right">SL</TableHead>
-                    <TableHead className="text-right">Thành tiền</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(viewTarget.items ?? []).map((it) => (
-                    <TableRow key={it.id}>
-                      <TableCell className="text-muted-foreground">{it.productId}</TableCell>
-                      <TableCell className="font-medium">{it.productName}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatVnd(it.price)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatVnd(it.subtotal)}</TableCell>
-                    </TableRow>
-                  ))}
-
-                  {(viewTarget.items ?? []).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                        Chưa có sản phẩm trong hoá đơn.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="grid gap-2">
-                {(paymentsError || paymentsLoading) && (
-                  <div className="rounded-xl border bg-muted/10 p-3 text-sm text-muted-foreground">
-                    {paymentsLoading ? 'Đang tải lịch sử thanh toán…' : paymentsError}
-                  </div>
-                )}
-
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[160px]">Thời gian</TableHead>
-                      <TableHead className="text-right">Số tiền</TableHead>
-                      <TableHead>Ghi chú</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(payments ?? []).map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-sm text-muted-foreground tabular-nums">
-                          {formatCreatedAt(p.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{formatVnd(p.amount)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {p.note && p.note.trim() !== '' ? p.note : '—'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-
-                    {(payments ?? []).length === 0 && !paymentsLoading && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
-                          Chưa có lịch sử thanh toán.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      <Modal
+      <OrderPaymentDialog
         open={payOpen}
         onOpenChange={(o) => {
-          if (!o) setPayOpen(false)
+          if (!o) {
+            setPayOpen(false)
+            setPayTarget(null)
+          } else {
+            setPayOpen(true)
+          }
         }}
-        title={viewTarget ? `Thanh toán hoá đơn #${viewTarget.orderCode ?? String(viewTarget.id)}` : 'Thanh toán'}
-        description="Bạn có thể thanh toán nhiều đợt; hệ thống sẽ lưu lịch sử từng lần."
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              size="default"
-              className="w-full sm:w-auto"
-              onClick={() => setPayOpen(false)}
-              disabled={paySubmitting}
-            >
-              Huỷ
-            </Button>
-            <Button
-              size="default"
-              className="w-full sm:w-auto"
-              onClick={submitPayment}
-              disabled={paySubmitting || !viewTarget}
-            >
-              Ghi nhận thanh toán
-            </Button>
-          </div>
+        title={
+          payTarget
+            ? `Thanh toán hoá đơn #${payTarget.orderCode ?? String(payTarget.id)}`
+            : 'Thanh toán'
         }
-        size="sm"
-      >
-        <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <Label htmlFor="payAmount">Số tiền</Label>
-            <Input
-              id="payAmount"
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="off"
-              spellCheck={false}
-              className="tabular-nums"
-              value={payAmountRaw === '' ? '' : formatThousandsComma(payAmountRaw)}
-              onChange={(e) => {
-                const next = stripLeadingZeros(digitsOnly(e.target.value))
-                setPayAmountRaw(next === '0' ? '0' : next)
-                const n = next.length ? Number(next) : 0
-                setPayValue((prev) => ({ ...prev, amount: n }))
-              }}
-              onBlur={(e) => {
-                const digits = digitsOnly(e.currentTarget.value)
-                if (digits === '') {
-                  setPayAmountRaw('0')
-                  setPayValue((prev) => ({ ...prev, amount: 0 }))
-                }
-              }}
-              placeholder="Nhập số tiền…"
-            />
-            {viewTarget && (
-              <div className="text-xs text-muted-foreground">
-                Còn lại: <span className="tabular-nums">{formatVnd(remainingAmount)}</span>
-              </div>
-            )}
-          </div>
+        description="Thanh toán trực tiếp từ danh sách hoá đơn."
+        remainingAmount={Math.max(
+          0,
+          (payTarget?.totalAmount ?? 0) - (payTarget?.paidAmount ?? 0),
+        )}
+        defaultAmount={Math.max(
+          0,
+          (payTarget?.totalAmount ?? 0) - (payTarget?.paidAmount ?? 0),
+        )}
+        submitting={paySubmitting}
+        onSubmit={submitPayment}
+      />
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="payNote">Ghi chú</Label>
-            <Input
-              id="payNote"
-              value={payValue.note ?? ''}
-              onChange={(e) => setPayValue((prev) => ({ ...prev, note: e.target.value }))}
-              placeholder="Ghi chú"
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

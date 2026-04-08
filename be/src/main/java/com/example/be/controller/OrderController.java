@@ -33,7 +33,7 @@ public class OrderController {
     }
 
     @GetMapping("/search")
-    @Operation(summary = "Search orders", description = "Search by orderCode contains or id equals. Optional status filter.")
+    @Operation(summary = "Search orders", description = "Tìm theo mã hoá đơn (contains), id (số nguyên), tên khách (contains), tổng tiền (khớp đúng: số thuần hoặc dạng 50.000 / 50,000). Có thể lọc theo status.")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> search(
             @RequestParam(name = "q", required = false, defaultValue = "") String q,
             @RequestParam(name = "status", required = false) OrderStatus status,

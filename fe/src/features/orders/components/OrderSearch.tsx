@@ -35,7 +35,7 @@ export function OrderSearch({
   value,
   onValueChange,
   status = 'ALL',
-  placeholder = 'Tìm theo mã hoá đơn…',
+  placeholder = 'Mã, tên khách, tổng tiền…',
   limit = 50,
   debounceMs = 320,
   className,

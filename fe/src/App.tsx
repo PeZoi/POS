@@ -8,6 +8,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { OrdersPage } from '@/pages/OrdersPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
   )
 }

@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig, loadEnv } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
@@ -10,6 +11,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.dirname(fileURLToPath(import.meta.url)), '')
   const pyBarcodePort = env.PY_BARCODE_PORT || '8765'
+  /** Bật bằng `npm run dev:https` hoặc `DEV_HTTPS=true` — cần cho camera (getUserMedia) khi mở qua IP LAN. */
+  const useHttps =
+    process.env.DEV_HTTPS === 'true' || env.DEV_HTTPS === 'true'
 
   return {
   resolve: {
@@ -19,6 +23,7 @@ export default defineConfig(({ mode }) => {
   },
   plugins: [
     react(),
+    ...(useHttps ? [basicSsl()] : []),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     VitePWA({
@@ -64,8 +69,14 @@ export default defineConfig(({ mode }) => {
     }),
   ],
   server: {
-    // Tunnels (ngrok, etc.): Host header is not localhost
+    host: true,
     allowedHosts: true,
+    ...(useHttps
+      ? {
+          /** Cert do `basicSsl()` gán ở configResolved; không dùng `https: true` (Vite 8 không còn boolean). */
+          hmr: { protocol: 'wss' },
+        }
+      : {}),
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

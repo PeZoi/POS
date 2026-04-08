@@ -9,6 +9,8 @@ export interface Product {
   price: number
   status: ProductStatus
   isAutoCreated: boolean
+  isDeleted: boolean
+  deletedAt?: IsoDateTimeString | null
   createdAt?: IsoDateTimeString
   updatedAt?: IsoDateTimeString
 }
@@ -24,12 +26,13 @@ export type ProductsCreateFn = (input: CreateProductInput) => Promise<Product>
 export type ProductsUpdateFn = (id: number, input: CreateProductInput) => Promise<Product>
 
 export type PaymentMethod = 'CASH' | 'QR' | 'CARD'
-export type OrderStatus = 'PENDING' | 'PAID' | 'CANCELLED'
+export type OrderStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED'
 
 export interface Order {
   id: number
   orderCode?: string
   customerName?: string | null
+  paidAmount?: number | null
   totalAmount: number | null
   paymentMethod: PaymentMethod | null
   status: OrderStatus | null

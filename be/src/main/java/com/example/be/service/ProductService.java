@@ -7,12 +7,12 @@ import com.example.be.dto.response.product.ProductResponse;
 import java.util.List;
 
 public interface ProductService {
-    List<ProductResponse> list();
+    List<ProductResponse> list(boolean deleted);
 
     /**
      * Tìm theo tên hoặc barcode (LIKE, không phân biệt hoa thường), tối đa {@code limit} bản ghi.
      */
-    List<ProductResponse> search(String q, int limit);
+    List<ProductResponse> search(String q, int limit, boolean deleted);
 
     ProductResponse getById(Long id);
 
@@ -23,5 +23,7 @@ public interface ProductService {
     ProductResponse update(Long id, ProductUpdateRequest request);
 
     void delete(Long id);
+
+    ProductResponse restore(Long id);
 }
 

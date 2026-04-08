@@ -12,6 +12,7 @@ public record OrderResponse(
         Long id,
         String orderCode,
         String customerName,
+        Integer paidAmount,
         Integer totalAmount,
         PaymentMethod paymentMethod,
         OrderStatus status,

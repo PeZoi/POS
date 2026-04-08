@@ -14,7 +14,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -24,16 +23,18 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
 
     @Override
-    public List<ProductResponse> list() {
-        return productRepository.findAll()
+    public List<ProductResponse> list(boolean deleted) {
+        List<ProductEntity> list = deleted
+                ? productRepository.findAllDeleted()
+                : productRepository.findAllActive();
+        return list
                 .stream()
-                .sorted(Comparator.comparing(ProductEntity::getId).reversed())
                 .map(ProductMapper::toResponse)
                 .toList();
     }
 
     @Override
-    public List<ProductResponse> search(String q, int limit) {
+    public List<ProductResponse> search(String q, int limit, boolean deleted) {
         if (q == null) {
             return List.of();
         }
@@ -47,7 +48,9 @@ public class ProductServiceImpl implements ProductService {
             return List.of();
         }
         int cap = Math.min(Math.max(limit, 1), 50);
-        return productRepository.searchByNameOrBarcode(safe, PageRequest.of(0, cap))
+        return (deleted
+                ? productRepository.searchDeletedByNameOrBarcode(safe, PageRequest.of(0, cap))
+                : productRepository.searchByNameOrBarcode(safe, PageRequest.of(0, cap)))
                 .stream()
                 .map(ProductMapper::toResponse)
                 .toList();
@@ -55,14 +58,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponse getById(Long id) {
-        ProductEntity p = productRepository.findById(id)
+        ProductEntity p = productRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
         return ProductMapper.toResponse(p);
     }
 
     @Override
     public ProductResponse getByBarcode(String barcode) {
-        ProductEntity p = productRepository.findByBarcode(barcode)
+        ProductEntity p = productRepository.findTopByBarcodeAndIsDeletedFalseOrderByIdDesc(barcode)
                 .orElseThrow(() -> new NotFoundException("Product not found by barcode: " + barcode));
         return ProductMapper.toResponse(p);
     }
@@ -70,7 +73,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
-        if (productRepository.existsByBarcode(request.barcode())) {
+        if (productRepository.existsByBarcodeAndIsDeletedFalse(request.barcode())) {
             throw new BadRequestException("Barcode already exists: " + request.barcode());
         }
         ProductEntity e = ProductMapper.toEntity(request);
@@ -80,9 +83,11 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public ProductResponse update(Long id, ProductUpdateRequest request) {
-        if (productRepository.existsByBarcodeAndIdNot(request.barcode(), id)) {
+        if (productRepository.existsByBarcodeAndIdNotAndIsDeletedFalse(request.barcode(), id)) {
             throw new BadRequestException("Barcode already exists: " + request.barcode());
         }
+        // Cho phép sửa cả sản phẩm đã xoá (isDeleted=true).
+        // Quy tắc barcode vẫn unique trong nhóm đang bán (isDeleted=false).
         ProductEntity e = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
         ProductMapper.apply(e, request);
@@ -92,10 +97,26 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public void delete(Long id) {
-        if (!productRepository.existsById(id)) {
-            throw new NotFoundException("Product not found: " + id);
+        ProductEntity e = productRepository.findByIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new NotFoundException("Product not found: " + id));
+        e.setIsDeleted(true);
+        e.setDeletedAt(java.time.LocalDateTime.now());
+        productRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse restore(Long id) {
+        ProductEntity e = productRepository.findByIdAndIsDeletedTrue(id)
+                .orElseThrow(() -> new NotFoundException("Product not found (deleted): " + id));
+
+        if (productRepository.existsByBarcodeAndIsDeletedFalse(e.getBarcode())) {
+            throw new BadRequestException("Barcode already exists (active): " + e.getBarcode());
         }
-        productRepository.deleteById(id);
+
+        e.setIsDeleted(false);
+        e.setDeletedAt(null);
+        return ProductMapper.toResponse(productRepository.save(e));
     }
 }
 

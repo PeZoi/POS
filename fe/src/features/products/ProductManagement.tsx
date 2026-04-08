@@ -1,19 +1,20 @@
 import * as React from 'react'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, RotateCcw } from 'lucide-react'
 
-import type { Product, ProductStatus } from '@/types/pos'
+import type { CreateProductInput, Product } from '@/types/pos'
 import { useProducts } from '@/features/products/hooks/useProducts'
 import { ProductFormModal } from '@/features/products/components/ProductFormModal'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { normalizeProductSearchText, productMatchesSearchQuery } from '@/features/products/utils/productSearch'
 import { ProductSearch } from '@/features/products/components/ProductSearch'
+import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 
-type StatusFilter = 'ALL' | ProductStatus
+type StatusFilter = 'ACTIVE' | 'DELETED'
 
 function formatVnd(amount: number) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
@@ -35,20 +36,22 @@ function formatUpdatedAt(iso?: string) {
   }).format(d)
 }
 
-function statusBadgeVariant(status: ProductStatus) {
-  return status === 'ACTIVE' ? 'success' : 'muted'
+function deletedBadgeVariant(isDeleted: boolean) {
+  return isDeleted ? 'destructive' : 'success'
 }
 
-function statusLabel(status: ProductStatus) {
-  return status === 'ACTIVE' ? 'Đang bán' : 'Tạm ngưng'
+function deletedLabel(isDeleted: boolean) {
+  return isDeleted ? 'Đã xoá' : 'Đang bán'
 }
 
 export function ProductManagement() {
-  const { items: products, loading, error, create, update, remove, reload } = useProducts()
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ACTIVE')
+  const { items: products, loading, error, create, update, remove, restore, reload } = useProducts({
+    deleted: statusFilter === 'DELETED',
+  })
 
   const [query, setQuery] = React.useState('')
   const [debouncedQuery, setDebouncedQuery] = React.useState('')
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ALL')
   const [visibleCount, setVisibleCount] = React.useState(50)
   const loadMoreRef = React.useRef<HTMLDivElement | null>(null)
   const [searchLoading, setSearchLoading] = React.useState(false)
@@ -65,7 +68,7 @@ export function ProductManagement() {
     const q = normalizeProductSearchText(debouncedQuery)
 
     const list = base.filter((p) => {
-      const matchStatus = statusFilter === 'ALL' ? true : p.status === statusFilter
+      const matchStatus = statusFilter === 'DELETED' ? p.isDeleted : !p.isDeleted
       const matchQuery = productMatchesSearchQuery(p, q)
       return matchStatus && matchQuery
     })
@@ -120,9 +123,32 @@ export function ProductManagement() {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
+    const name = deleteTarget.name
     await remove(deleteTarget.id)
     setDeleteTarget(null)
+    toast.success(`Đã xoá ${name}`)
   }
+
+  const onRestore = React.useCallback(async (p: Product) => {
+    const ok = globalThis.confirm?.(
+      `Khôi phục sản phẩm "${p.name}"?`,
+    )
+    if (!ok) return
+    const restored = await restore(p.id)
+    toast.success(`Đã khôi phục ${restored.name}`)
+  }, [restore])
+
+  const handleCreate = React.useCallback(async (input: CreateProductInput) => {
+    const created = await create(input)
+    toast.success(`Đã thêm ${created.name}`)
+    return created
+  }, [create])
+
+  const handleUpdate = React.useCallback(async (id: number, input: CreateProductInput) => {
+    const updated = await update(id, input)
+    toast.success(`Đã cập nhật ${updated.name}`)
+    return updated
+  }, [update])
 
   return (
     <div className="grid gap-4 md:gap-6">
@@ -168,6 +194,7 @@ export function ProductManagement() {
               limit={100}
               debounceMs={320}
               inputClassName="pl-9"
+              deleted={statusFilter === 'DELETED'}
               onStateChange={(s) => {
                 setDebouncedQuery(s.debouncedQuery)
                 setSearchLoading(s.loading)
@@ -185,9 +212,8 @@ export function ProductManagement() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
-            <option value="ALL">Tất cả trạng thái</option>
             <option value="ACTIVE">Đang bán</option>
-            <option value="INACTIVE">Tạm ngưng</option>
+            <option value="DELETED">Đã xoá</option>
           </select>
         </div>
 
@@ -230,8 +256,8 @@ export function ProductManagement() {
                           {formatVnd(p.price)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={statusBadgeVariant(p.status)}>
-                            {statusLabel(p.status)}
+                          <Badge variant={deletedBadgeVariant(p.isDeleted)}>
+                            {deletedLabel(p.isDeleted)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -254,14 +280,26 @@ export function ProductManagement() {
                               <Pencil className="mr-1.5 size-4" />
                               Sửa
                             </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => setDeleteTarget(p)}
-                            >
-                              <Trash2 className="mr-1.5 size-4" />
-                              Xoá
-                            </Button>
+                            {statusFilter === 'ACTIVE' && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setDeleteTarget(p)}
+                              >
+                                <Trash2 className="mr-1.5 size-4" />
+                                Xoá
+                              </Button>
+                            )}
+                            {statusFilter === 'DELETED' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void onRestore(p)}
+                              >
+                                <RotateCcw className="mr-1.5 size-4" />
+                                Khôi phục
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -300,7 +338,7 @@ export function ProductManagement() {
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        <Badge variant={statusBadgeVariant(p.status)}>{statusLabel(p.status)}</Badge>
+                        <Badge variant={deletedBadgeVariant(p.isDeleted)}>{deletedLabel(p.isDeleted)}</Badge>
                         {p.isAutoCreated && <Badge variant="secondary">Auto</Badge>}
                       </div>
                     </div>
@@ -324,14 +362,26 @@ export function ProductManagement() {
                       <Pencil className="mr-1.5 size-4" />
                       Sửa
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setDeleteTarget(p)}
-                    >
-                      <Trash2 className="mr-1.5 size-4" />
-                      Xoá
-                    </Button>
+                    {statusFilter === 'ACTIVE' && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeleteTarget(p)}
+                      >
+                        <Trash2 className="mr-1.5 size-4" />
+                        Xoá
+                      </Button>
+                    )}
+                    {statusFilter === 'DELETED' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void onRestore(p)}
+                      >
+                        <RotateCcw className="mr-1.5 size-4" />
+                        Khôi phục
+                      </Button>
+                    )}
                   </CardFooter>
                 </Card>
               ))}
@@ -370,8 +420,8 @@ export function ProductManagement() {
         }}
         editing={editing}
         existingBarcodes={existingBarcodes}
-        onCreate={create}
-        onUpdate={update}
+        onCreate={handleCreate}
+        onUpdate={handleUpdate}
       />
 
       <Modal

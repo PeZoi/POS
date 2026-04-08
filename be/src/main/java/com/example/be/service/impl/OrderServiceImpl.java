@@ -76,8 +76,13 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderCode(generateUniqueOrderCode());
         order.setPaymentMethod(request.paymentMethod());
         order.setStatus(request.status());
+        String name = request.customerName() == null ? null : request.customerName().trim();
+        if (name != null && name.isBlank()) name = null;
+        order.setCustomerName(name);
+        order.setPaidAmount(request.paidAmount());
 
         applyItems(order, request.items());
+        normalizePaidAmount(order);
         OrderEntity saved = orderRepository.save(order);
         OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
         return OrderMapper.toResponse(full);
@@ -91,9 +96,14 @@ public class OrderServiceImpl implements OrderService {
 
         order.setPaymentMethod(request.paymentMethod());
         order.setStatus(request.status());
+        String name = request.customerName() == null ? null : request.customerName().trim();
+        if (name != null && name.isBlank()) name = null;
+        order.setCustomerName(name);
+        order.setPaidAmount(request.paidAmount());
 
         order.getItems().clear();
         applyItems(order, request.items());
+        normalizePaidAmount(order);
 
         OrderEntity saved = orderRepository.save(order);
         OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
@@ -115,6 +125,16 @@ public class OrderServiceImpl implements OrderService {
         return OrderMapper.toResponse(full);
     }
 
+    private void normalizePaidAmount(OrderEntity order) {
+        Integer total = order.getTotalAmount() == null ? 0 : order.getTotalAmount();
+        Integer paid = order.getPaidAmount();
+        if (paid == null) return;
+        int p = Math.max(0, paid);
+        int t = Math.max(0, total);
+        if (p > t) p = t;
+        order.setPaidAmount(p);
+    }
+
     @Override
     @Transactional
     public void delete(Long id) {
@@ -127,7 +147,7 @@ public class OrderServiceImpl implements OrderService {
     private void applyItems(OrderEntity order, List<OrderItemRequest> items) {
         int total = 0;
         for (OrderItemRequest it : items) {
-            ProductEntity product = productRepository.findById(it.productId())
+            ProductEntity product = productRepository.findByIdAndIsDeletedFalse(it.productId())
                     .orElseThrow(() -> new NotFoundException("Product not found: " + it.productId()));
 
             int price = it.unitPrice() != null ? it.unitPrice() : product.getPrice();

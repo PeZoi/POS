@@ -16,6 +16,8 @@ public class ProductMapper {
         e.setPrice(req.price());
         e.setStatus(req.status());
         e.setIsAutoCreated(Boolean.TRUE.equals(req.isAutoCreated()));
+        e.setIsDeleted(false);
+        e.setDeletedAt(null);
         return e;
     }
 
@@ -35,6 +37,8 @@ public class ProductMapper {
                 e.getPrice(),
                 e.getStatus(),
                 Boolean.TRUE.equals(e.getIsAutoCreated()),
+                Boolean.TRUE.equals(e.getIsDeleted()),
+                e.getDeletedAt(),
                 e.getCreatedAt(),
                 e.getUpdatedAt()
         );

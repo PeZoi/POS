@@ -21,6 +21,7 @@ type CartScanListProps = {
   onUpdateUnitPrice: (productId: number, price: number) => Promise<void> | void
   updatingProductId?: number | null
   formatVnd: (amount: number) => string
+  onRequestScan?: () => void
 }
 
 export function CartScanList({
@@ -34,6 +35,7 @@ export function CartScanList({
   onUpdateUnitPrice,
   updatingProductId = null,
   formatVnd,
+  onRequestScan,
 }: CartScanListProps) {
   const lines = React.useMemo(() => cartLinesFromProducts(products), [products])
 
@@ -81,12 +83,15 @@ export function CartScanList({
         <CardContent>
           {products.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
-              <div
-                className="relative grid size-18 place-items-center rounded-2xl border border-dashed border-muted-foreground/30 bg-linear-to-br from-muted/50 to-muted/20 text-muted-foreground shadow-inner ring-1 ring-border/40"
-                aria-hidden
+              <button
+                type="button"
+                className="relative grid size-18 place-items-center rounded-2xl border border-dashed border-muted-foreground/30 bg-linear-to-br from-muted/50 to-muted/20 text-muted-foreground shadow-inner ring-1 ring-border/40 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                onClick={() => onRequestScan?.()}
+                aria-label="Bật camera để quét barcode"
+                title="Bật camera để quét barcode"
               >
                 <ScanLine className="size-9 opacity-90" strokeWidth={1.65} />
-              </div>
+              </button>
               <div className="max-w-[28ch] space-y-1.5 text-center">
                 <p className="text-base font-medium tracking-tight text-foreground">
                   Chưa có sản phẩm

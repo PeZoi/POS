@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Modal } from '@/components/ui/modal'
 import type { CreateProductInput } from '@/types/pos'
+import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
 
 type QuickCreateProductModalProps = {
   open: boolean
@@ -37,11 +38,23 @@ export function QuickCreateProductModal({
   ])
 
   const parsedPrice = React.useMemo(() => {
-    const digits = draftPriceRaw.replace(/[^\d]/g, '')
-    if (digits.length === 0) return 0
+    const digits = stripLeadingZeros(digitsOnly(draftPriceRaw))
+    if (digits === '' || digits === '0') return 0
     const n = Number(digits)
     return Number.isFinite(n) ? n : 0
   }, [draftPriceRaw])
+
+  function moveCaretToEndOnFocus(e: React.FocusEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    const len = el.value.length
+    window.setTimeout(() => {
+      try {
+        el.setSelectionRange(len, len)
+      } catch {
+        // ignore
+      }
+    }, 0)
+  }
 
   React.useEffect(() => {
     if (!open) return
@@ -141,15 +154,23 @@ export function QuickCreateProductModal({
             ref={priceInputRef}
             autoFocus
             type="tel"
-            value={draftPriceRaw}
-            onChange={(e) => setDraftPriceRaw(e.target.value)}
-            placeholder="Nhập giá…"
+            value={draftPriceRaw === '' ? '' : formatThousandsComma(draftPriceRaw)}
+            onChange={(e) => {
+              setDraftPriceRaw(stripLeadingZeros(digitsOnly(e.target.value)))
+            }}
+            onBlur={(e) => {
+              const digits = digitsOnly(e.currentTarget.value)
+              if (digits === '') setDraftPriceRaw('0')
+            }}
+            onFocus={moveCaretToEndOnFocus}
+            placeholder="Nhập số tiền"
             inputMode="numeric"
             pattern="[0-9]*"
             enterKeyHint="done"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
+            className="h-11 rounded-xl tabular-nums"
           />
           <div className="text-sm text-muted-foreground">
             {parsedPrice > 0 ? formatVnd(parsedPrice) : '—'}

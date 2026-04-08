@@ -37,6 +37,9 @@ public class OrderEntity {
     @Column(name = "customer_name", length = 120)
     private String customerName;
 
+    @Column(name = "paid_amount")
+    private Integer paidAmount;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

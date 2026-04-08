@@ -26,17 +26,20 @@ public class ProductController {
 
     @GetMapping
     @Operation(summary = "List products", description = "Get all products (no pagination).")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> list() {
-        return ResponseEntity.ok(ApiResponse.success(productService.list()));
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> list(
+            @RequestParam(value = "deleted", required = false, defaultValue = "false") boolean deleted
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(productService.list(deleted)));
     }
 
     @GetMapping("/search")
     @Operation(summary = "Search products", description = "Search by name or barcode (case-insensitive, partial match).")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> search(
             @RequestParam(value = "q", required = false, defaultValue = "") String q,
-            @RequestParam(value = "limit", required = false, defaultValue = "5") int limit
+            @RequestParam(value = "limit", required = false, defaultValue = "5") int limit,
+            @RequestParam(value = "deleted", required = false, defaultValue = "false") boolean deleted
     ) {
-        return ResponseEntity.ok(ApiResponse.success(productService.search(q, limit)));
+        return ResponseEntity.ok(ApiResponse.success(productService.search(q, limit, deleted)));
     }
 
     @GetMapping("/{id}")
@@ -81,6 +84,12 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         productService.delete(id);
         return ResponseEntity.ok(ApiResponse.deleted(null));
+    }
+
+    @PutMapping("/{id}/restore")
+    @Operation(summary = "Restore product", description = "Undelete a soft-deleted product.")
+    public ResponseEntity<ApiResponse<ProductResponse>> restore(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.updated(productService.restore(id)));
     }
 }
 

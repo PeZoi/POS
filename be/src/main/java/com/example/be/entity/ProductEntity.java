@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "products", indexes = {
-        @Index(name = "idx_products_barcode", columnList = "barcode", unique = true)
+        @Index(name = "idx_products_barcode", columnList = "barcode")
 })
 public class ProductEntity {
     @Id
@@ -23,7 +23,7 @@ public class ProductEntity {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, length = 100)
     private String barcode;
 
     @Column(nullable = false)
@@ -35,6 +35,12 @@ public class ProductEntity {
 
     @Column(name = "is_auto_created", nullable = false)
     private Boolean isAutoCreated = false;
+
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

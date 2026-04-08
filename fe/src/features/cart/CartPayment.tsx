@@ -1,22 +1,22 @@
 import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
-import { useCartStore } from '@/features/cart/cart-store'
 import { cartGrandTotal, cartLinesFromProducts } from '@/features/cart/cart-lines'
-import { EmbeddedBarcodeScannerSection } from '@/features/cart/components/EmbeddedBarcodeScannerSection'
-import { useScannerSettings } from '@/features/cart/scanner-config'
+import { useCartStore } from '@/features/cart/cart-store'
 import { CartProductSearch } from '@/features/cart/components/CartProductSearch'
 import { CartScanList } from '@/features/cart/components/CartScanList'
-import { ScannerModeMenu } from '@/features/cart/components/ScannerModeMenu'
-import type { ScannerModeId } from '@/features/cart/scanner-mode'
+import { EmbeddedBarcodeScannerSection } from '@/features/cart/components/EmbeddedBarcodeScannerSection'
 import { QuickCreateProductModal } from '@/features/cart/components/QuickCreateProductModal'
-import type { CreateProductInput, Product } from '@/types/pos'
-import { productService } from '@/services/productService'
-import { ApiError } from '@/services/apiClient'
+import { ScannerModeMenu } from '@/features/cart/components/ScannerModeMenu'
+import { useScannerSettings } from '@/features/cart/scanner-config'
+import type { ScannerModeId } from '@/features/cart/scanner-mode'
 import { stopAllVideoStreamsUnderRoot } from '@/lib/camera-stream'
-import { cn } from '@/lib/utils'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { ApiError } from '@/services/apiClient'
+import { productService } from '@/services/productService'
+import type { CreateProductInput, Product } from '@/types/pos'
+import { ArrowLeft } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 export default function CartPayment() {
   const navigate = useNavigate()
@@ -34,66 +34,8 @@ export default function CartPayment() {
   const [pendingBarcode, setPendingBarcode] = React.useState<string | null>(null)
   const [scanError, setScanError] = React.useState<string | null>(null)
   const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
-  const [cartToastMessage, setCartToastMessage] = React.useState<string | null>(null)
-  const [cartToastExiting, setCartToastExiting] = React.useState(false)
-  const [cartToastNonce, setCartToastNonce] = React.useState(0)
-  const cartToastHideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cartToastRemoveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const clearCartToastTimers = React.useCallback(() => {
-    if (cartToastHideTimerRef.current) {
-      clearTimeout(cartToastHideTimerRef.current)
-      cartToastHideTimerRef.current = null
-    }
-    if (cartToastRemoveTimerRef.current) {
-      clearTimeout(cartToastRemoveTimerRef.current)
-      cartToastRemoveTimerRef.current = null
-    }
-  }, [])
-
-  const showAddedToCartToast = React.useCallback(
-    (productName: string) => {
-      clearCartToastTimers()
-      setCartToastExiting(false)
-      setCartToastNonce((n) => n + 1)
-      setCartToastMessage(`Đã thêm ${productName} vào giỏ hàng`)
-      cartToastHideTimerRef.current = setTimeout(() => {
-        setCartToastExiting(true)
-        cartToastRemoveTimerRef.current = setTimeout(() => {
-          setCartToastMessage(null)
-          setCartToastExiting(false)
-          cartToastRemoveTimerRef.current = null
-        }, 320)
-        cartToastHideTimerRef.current = null
-      }, 1000)
-    },
-    [clearCartToastTimers],
-  )
-
-  const showPriceUpdatedToast = React.useCallback(
-    (productName: string, priceText: string) => {
-      clearCartToastTimers()
-      setCartToastExiting(false)
-      setCartToastNonce((n) => n + 1)
-      setCartToastMessage(`Đã cập nhật giá ${productName} → ${priceText}`)
-      cartToastHideTimerRef.current = setTimeout(() => {
-        setCartToastExiting(true)
-        cartToastRemoveTimerRef.current = setTimeout(() => {
-          setCartToastMessage(null)
-          setCartToastExiting(false)
-          cartToastRemoveTimerRef.current = null
-        }, 320)
-        cartToastHideTimerRef.current = null
-      }, 1200)
-    },
-    [clearCartToastTimers],
-  )
-
-  React.useEffect(() => {
-    return () => {
-      clearCartToastTimers()
-    }
-  }, [clearCartToastTimers])
+  const [scannerPanelActive, setScannerPanelActive] = React.useState(false)
+  const scannerPanelWrapRef = React.useRef<HTMLDivElement | null>(null)
 
   // iOS Safari/back-forward cache: đảm bảo dừng camera khi rời trang (tránh crash/reload ngẫu nhiên).
   React.useEffect(() => {
@@ -172,9 +114,12 @@ export default function CartPayment() {
         if (already) return [...prev, { ...product }]
         return [product, ...prev]
       })
-      showAddedToCartToast(product.name)
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng`, {
+        description: `Giá: ${formatVnd(product.price)}`,
+        duration: 1000,
+      })
     },
-    [setProducts, showAddedToCartToast],
+    [formatVnd, setProducts],
   )
 
   const onCreateProduct = React.useCallback(
@@ -221,32 +166,6 @@ export default function CartPayment() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
-      {cartToastMessage && (
-        <div
-          className="pointer-events-none fixed left-1/2 top-[calc(0.65rem+env(safe-area-inset-top))] z-100 flex w-full max-w-full -translate-x-1/2 justify-center px-3"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            key={cartToastNonce}
-            className={cn(
-              'flex w-max max-w-[min(92vw,26rem)] items-start gap-3 rounded-2xl border border-emerald-500/35 bg-linear-to-br from-emerald-800 to-teal-900 px-4 py-3 text-white shadow-[0_12px_36px_-6px_rgba(6,78,59,0.55),0_0_0_1px_rgba(255,255,255,0.12)_inset] dark:from-emerald-700 dark:to-teal-800 dark:border-emerald-400/30 dark:shadow-[0_12px_36px_-6px_rgba(0,0,0,0.5)]',
-              cartToastExiting
-                ? 'animate-[cart-toast-out_0.32s_ease-in_forwards]'
-                : 'animate-[cart-toast-in_0.42s_cubic-bezier(0.22,1,0.36,1)_both]',
-            )}
-          >
-            <CheckCircle2
-              className="mt-0.5 size-5 shrink-0 text-emerald-200 drop-shadow-sm"
-              aria-hidden
-            />
-            <p className="min-w-0 max-w-full text-left text-sm leading-snug text-emerald-50">
-              <span className="font-semibold wrap-break-word text-white">{cartToastMessage}</span>
-            </p>
-          </div>
-        </div>
-      )}
-
       <header className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b bg-background/95 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-background/80 sm:gap-3 sm:px-4">
         <Link
           to="/"
@@ -269,19 +188,27 @@ export default function CartPayment() {
           onQuickAdd={() => void openCreatePopup(null)}
           formatVnd={formatVnd}
         />
-        <EmbeddedBarcodeScannerSection
-          layout="panel"
-          onScan={handleScan}
-          settings={scannerSettings}
-          scannerMode={scannerMode}
-          onScannerModeChange={setScannerMode}
-        />
+        <div ref={scannerPanelWrapRef}>
+          <EmbeddedBarcodeScannerSection
+            layout="panel"
+            scannerActive={scannerPanelActive}
+            onScannerActiveChange={setScannerPanelActive}
+            onScan={handleScan}
+            settings={scannerSettings}
+            scannerMode={scannerMode}
+            onScannerModeChange={setScannerMode}
+          />
+        </div>
       </div>
 
       <CartScanList
         products={scannedProducts}
         draftPrices={draftPrices}
         onDraftPriceChange={onDraftPriceChange}
+        onRequestScan={() => {
+          setScannerPanelActive(true)
+          scannerPanelWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }}
         onClear={() => {
           clearCart()
         }}
@@ -323,7 +250,7 @@ export default function CartPayment() {
               prev.map((p: Product) => (p.id === productId ? { ...p, price } : p)),
             )
             setDraftPrice(productId, String(price))
-            showPriceUpdatedToast(current.name, formatVnd(price))
+            toast.success(`Đã cập nhật giá ${current.name} → ${formatVnd(price)}`)
           } catch (e) {
             const message =
               e instanceof ApiError || e instanceof Error

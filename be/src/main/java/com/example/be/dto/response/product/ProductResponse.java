@@ -13,6 +13,8 @@ public record ProductResponse(
         Integer price,
         ProductStatus status,
         Boolean isAutoCreated,
+        Boolean isDeleted,
+        LocalDateTime deletedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

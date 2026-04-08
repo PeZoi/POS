@@ -34,6 +34,9 @@ export type ProductSearchProps = {
 
   /** Notify parent with latest loading/error/results */
   onStateChange?: (state: ProductSearchState) => void
+
+  /** Nếu true, search trong nhóm đã xoá (soft-deleted) */
+  deleted?: boolean
 }
 
 export function ProductSearch({
@@ -49,6 +52,7 @@ export function ProductSearch({
   onPickProduct,
   formatVnd,
   onStateChange,
+  deleted = false,
 }: ProductSearchProps) {
   const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [open, setOpen] = React.useState(false)
@@ -97,7 +101,7 @@ export function ProductSearch({
     })
 
     productService
-      .search(q, limit)
+      .search(q, limit, { deleted })
       .then((list) => {
         if (requestIdRef.current !== id) return
         setResults(list)
@@ -125,7 +129,7 @@ export function ProductSearch({
         })
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, limit])
+  }, [debouncedQuery, limit, deleted])
 
   React.useEffect(() => {
     if (!onPickProduct) return

@@ -43,21 +43,24 @@ function normalize(s: string) {
 
 function statusBadgeVariant(status: OrderStatus | null) {
   if (status === 'PAID') return 'success'
+  if (status === 'PARTIALLY_PAID') return 'secondary'
   if (status === 'CANCELLED') return 'muted'
   return 'secondary'
 }
 
 function statusLabel(status: OrderStatus | null) {
   if (status === 'PAID') return 'Đã thanh toán'
+  if (status === 'PARTIALLY_PAID') return 'Thanh toán 1 phần'
   if (status === 'CANCELLED') return 'Đã huỷ'
   return 'Chờ thanh toán'
 }
 
-function paymentLabel(method: PaymentMethod | null) {
-  if (method === 'CASH') return 'Tiền mặt'
-  if (method === 'QR') return 'QR'
-  if (method === 'CARD') return 'Thẻ'
-  return '—'
+function paidAmountLabel(paidAmount: number | null | undefined, totalAmount: number | null | undefined) {
+  const paid = paidAmount == null ? null : Math.max(0, Math.floor(paidAmount))
+  const total = totalAmount == null ? null : Math.max(0, Math.floor(totalAmount))
+  if (paid == null) return '—'
+  if (total != null && paid > total) return formatVnd(total)
+  return formatVnd(paid)
 }
 
 type OrderFormValue = {
@@ -400,6 +403,7 @@ export function OrderManagement() {
         >
           <option value="ALL">Tất cả trạng thái</option>
           <option value="PENDING">Chờ thanh toán</option>
+          <option value="PARTIALLY_PAID">Thanh toán 1 phần</option>
           <option value="PAID">Đã thanh toán</option>
           <option value="CANCELLED">Đã huỷ</option>
         </select>
@@ -412,7 +416,7 @@ export function OrderManagement() {
               <TableHead className="w-[130px]">Mã</TableHead>
               <TableHead>Khách hàng</TableHead>
               <TableHead className="w-[160px]">Trạng thái</TableHead>
-              <TableHead className="w-[140px]">Thanh toán</TableHead>
+              <TableHead className="w-[170px] text-right">Đã thanh toán</TableHead>
               <TableHead className="text-right">Tổng tiền</TableHead>
               <TableHead className="w-[190px]">Ngày tạo</TableHead>
               <TableHead className="w-[220px]" />
@@ -432,8 +436,8 @@ export function OrderManagement() {
                 <TableCell>
                   <Badge variant={statusBadgeVariant(o.status)}>{statusLabel(o.status)}</Badge>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {paymentLabel(o.paymentMethod)}
+                <TableCell className="text-right tabular-nums">
+                  {paidAmountLabel(o.paidAmount, o.totalAmount)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatVnd(o.totalAmount ?? 0)}
@@ -518,8 +522,10 @@ export function OrderManagement() {
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">Thanh toán</div>
-                  <div className="text-sm text-muted-foreground">{paymentLabel(o.paymentMethod)}</div>
+                  <div className="text-sm text-muted-foreground">Đã thanh toán</div>
+                  <div className="text-sm text-muted-foreground tabular-nums">
+                    {paidAmountLabel(o.paidAmount, o.totalAmount)}
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="justify-end">
@@ -680,8 +686,10 @@ export function OrderManagement() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Thanh toán</div>
-                <div>{paymentLabel(viewTarget.paymentMethod)}</div>
+                <div className="text-muted-foreground">Đã thanh toán</div>
+                <div className="tabular-nums">
+                  {paidAmountLabel(viewTarget.paidAmount, viewTarget.totalAmount)}
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-muted-foreground">Ngày tạo</div>

@@ -5,7 +5,7 @@ import type { Product, ProductsCreateFn, ProductsUpdateFn } from '@/types/pos'
 
 export type { ProductsCreateFn, ProductsUpdateFn } from '@/types/pos'
 
-export function useProducts() {
+export function useProducts(opts?: { deleted?: boolean }) {
   const [items, setItems] = React.useState<Product[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -14,14 +14,14 @@ export function useProducts() {
     setLoading(true)
     setError(null)
     try {
-      const data = await productService.list()
+      const data = await productService.list({ deleted: Boolean(opts?.deleted) })
       setItems(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể tải sản phẩm.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [opts?.deleted])
 
   React.useEffect(() => {
     void reload()
@@ -44,6 +44,13 @@ export function useProducts() {
     setItems((prev) => prev.filter((p) => p.id !== id))
   }, [])
 
-  return { items, loading, error, reload, create, update, remove }
+  const restore = React.useCallback(async (id: number) => {
+    const restored = await productService.restore(id)
+    // Nếu đang xem danh sách "Đã xoá" thì bỏ khỏi list hiện tại.
+    setItems((prev) => prev.filter((p) => p.id !== id))
+    return restored
+  }, [])
+
+  return { items, loading, error, reload, create, update, remove, restore }
 }
 

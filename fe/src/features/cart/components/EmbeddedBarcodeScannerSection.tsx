@@ -17,6 +17,12 @@ type PanelProps = {
   layout: 'panel'
   /** Mặc định camera tắt (giống trang giỏ). */
   defaultScannerActive?: boolean
+  /**
+   * Controlled mode (optional): parent quyết định camera đang bật/tắt.
+   * Nếu truyền prop này, state nội bộ sẽ không tự quản lý nữa.
+   */
+  scannerActive?: boolean
+  onScannerActiveChange?: (active: boolean) => void
 }
 
 type EmbeddedProps = {
@@ -54,7 +60,13 @@ export function EmbeddedBarcodeScannerSection(
   )
 
   /** Embedded: mount = đang bật camera (parent unmount khi đóng). */
-  const scannerActive = layout === 'panel' ? panelActive : true
+  const isControlled = layout === 'panel' && typeof props.scannerActive === 'boolean'
+  const scannerActive =
+    layout === 'panel'
+      ? isControlled
+        ? (props.scannerActive as boolean)
+        : panelActive
+      : true
 
   const didFallbackFromPythonRef = React.useRef(false)
 
@@ -86,10 +98,17 @@ export function EmbeddedBarcodeScannerSection(
     }
   }, [])
 
-  const setPanelScannerActive = React.useCallback((next: boolean) => {
-    if (layout !== 'panel') return
-    setPanelActive(next)
-  }, [layout])
+  const setPanelScannerActive = React.useCallback(
+    (next: boolean) => {
+      if (layout !== 'panel') return
+      if (typeof props.onScannerActiveChange === 'function') {
+        props.onScannerActiveChange(next)
+        return
+      }
+      setPanelActive(next)
+    },
+    [layout, props],
+  )
 
   const viewport = scannerActive ? (
     scannerMode === 'html5' ? (

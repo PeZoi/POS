@@ -13,6 +13,8 @@ import java.util.List;
 public record OrderCreateRequest(
         @Schema(example = "CASH") PaymentMethod paymentMethod,
         @Schema(example = "PENDING") @NotNull OrderStatus status,
+        @Schema(example = "Nguyễn Văn A", description = "Tên khách hàng (có thể bỏ trống/null)") String customerName,
+        @Schema(example = "50000", description = "Số tiền đã thanh toán (có thể null)") Integer paidAmount,
         @NotEmpty @Valid List<OrderItemRequest> items
 ) {
 }

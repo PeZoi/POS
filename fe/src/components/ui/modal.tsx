@@ -50,23 +50,26 @@ export function Modal({
 
   if (!open || !mounted) return null
 
+  const isOutsideContent = React.useCallback((target: EventTarget | null) => {
+    const content = contentRef.current
+    if (!content || !target || !(target instanceof Node)) return false
+    return !content.contains(target)
+  }, [])
+
   return createPortal(
     <div
       className="fixed inset-0 z-50"
       role="dialog"
       aria-modal="true"
-      onPointerDown={(e) => {
-        const content = contentRef.current
-        if (!content) return
-        const target = e.target as Node | null
-        if (target && !content.contains(target)) onOpenChange(false)
-      }}
       onMouseDown={(e) => {
-        // Fallback for older browsers/devices that might not fire pointer events as expected.
-        const content = contentRef.current
-        if (!content) return
-        const target = e.target as Node | null
-        if (target && !content.contains(target)) onOpenChange(false)
+        // Tránh đóng modal ngay ở mousedown: nếu không, modal biến mất trước mouseup
+        // và sự kiện sẽ “xuyên” xuống nút/input phía dưới (ghost click).
+        if (isOutsideContent(e.target)) e.preventDefault()
+      }}
+      onClick={(e) => {
+        if (!isOutsideContent(e.target)) return
+        e.stopPropagation()
+        onOpenChange(false)
       }}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />

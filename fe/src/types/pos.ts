@@ -25,8 +25,14 @@ export type UpdateProductInput = Partial<CreateProductInput>
 export type ProductsCreateFn = (input: CreateProductInput) => Promise<Product>
 export type ProductsUpdateFn = (id: number, input: CreateProductInput) => Promise<Product>
 
-export type PaymentMethod = 'CASH' | 'QR' | 'CARD'
 export type OrderStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED'
+
+export interface OrderPayment {
+  id: number
+  amount: number
+  note?: string | null
+  createdAt?: IsoDateTimeString
+}
 
 export interface Order {
   id: number
@@ -34,7 +40,6 @@ export interface Order {
   customerName?: string | null
   paidAmount?: number | null
   totalAmount: number | null
-  paymentMethod: PaymentMethod | null
   status: OrderStatus | null
   createdAt?: IsoDateTimeString
   items?: OrderItemDetail[]

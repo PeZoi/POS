@@ -1,7 +1,6 @@
 package com.example.be.entity;
 
 import com.example.be.enums.OrderStatus;
-import com.example.be.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,10 +24,6 @@ public class OrderEntity {
 
     @Column(name = "total_amount")
     private Integer totalAmount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", length = 20)
-    private PaymentMethod paymentMethod;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)

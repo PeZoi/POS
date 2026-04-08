@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
@@ -14,6 +15,8 @@ const badgeVariants = cva(
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
+        warning:
+          "bg-amber-500 text-white dark:bg-amber-400 dark:text-amber-950 [a]:hover:bg-amber-500/90 dark:[a]:hover:bg-amber-400/90",
         success:
           "bg-emerald-600 text-white dark:bg-emerald-500/90 dark:text-emerald-50 [a]:hover:bg-emerald-600/90 dark:[a]:hover:bg-emerald-500/80",
         muted:

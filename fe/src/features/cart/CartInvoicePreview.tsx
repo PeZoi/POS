@@ -212,7 +212,6 @@ export default function CartInvoicePreview() {
             : safePaidAmount
 
       await orderService.create({
-        paymentMethod: null,
         status,
         customerName: customerNameOrNull,
         paidAmount: paidAmountToSend,

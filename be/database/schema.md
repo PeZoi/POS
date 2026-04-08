@@ -63,7 +63,6 @@ Mỗi lần thanh toán là một hóa đơn.
 | -------------- | ------------- | ------------------ | -------------------------- |
 | id             | BIGINT        | PK, AUTO_INCREMENT | ID hóa đơn                 |
 | total_amount   | INTERGER      |                    | Tổng tiền                  |
-| payment_method | VARCHAR(20)   |                    | CASH / QR / CARD           |
 | status         | VARCHAR(20)   |                    | PENDING / PAID / CANCELLED |
 | created_at     | TIMESTAMP     |                    | Thời gian tạo              |
 
@@ -73,7 +72,6 @@ Mỗi lần thanh toán là một hóa đơn.
 CREATE TABLE orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     total_amount INTERGER,
-    payment_method VARCHAR(20),
     status VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -108,5 +106,33 @@ CREATE TABLE order_items (
         FOREIGN KEY (order_id) REFERENCES orders(id),
     CONSTRAINT fk_product
         FOREIGN KEY (product_id) REFERENCES products(id)
+);
+```
+
+---
+
+## 4️⃣ Table: `order_payments`
+
+Lưu **lịch sử thanh toán theo nhiều đợt** cho mỗi hóa đơn.
+
+| Column         | Type        | Constraint         | Description                     |
+| -------------- | ----------- | ------------------ | ------------------------------- |
+| id             | BIGINT      | PK, AUTO_INCREMENT | ID lịch sử thanh toán          |
+| order_id       | BIGINT      | FK, NOT NULL       | Hóa đơn                        |
+| amount         | INT         | NOT NULL           | Số tiền thanh toán             |
+| note           | VARCHAR(255)|                    | Ghi chú (tuỳ chọn)             |
+| created_at     | TIMESTAMP   |                    | Thời gian thanh toán (ghi nhận)|
+
+### SQL
+
+```sql
+CREATE TABLE order_payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    amount INT NOT NULL,
+    note VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_order_payments_order
+        FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 ```

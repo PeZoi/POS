@@ -1,7 +1,6 @@
 package com.example.be.dto.response.order;
 
 import com.example.be.enums.OrderStatus;
-import com.example.be.enums.PaymentMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -14,7 +13,6 @@ public record OrderResponse(
         String customerName,
         Integer paidAmount,
         Integer totalAmount,
-        PaymentMethod paymentMethod,
         OrderStatus status,
         LocalDateTime createdAt,
         List<OrderItemResponse> items

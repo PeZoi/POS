@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, PaymentMethod } from '@/types/pos'
+import type { Order, OrderPayment, OrderStatus } from '@/types/pos'
 import { apiRequest } from '@/services/apiClient'
 
 export type OrderItemCreate = {
@@ -8,11 +8,15 @@ export type OrderItemCreate = {
 }
 
 export type CreateOrderInput = {
-  paymentMethod: PaymentMethod | null
   status: OrderStatus
   customerName?: string | null
   paidAmount?: number | null
   items: OrderItemCreate[]
+}
+
+export type CreateOrderPaymentInput = {
+  amount: number
+  note?: string | null
 }
 
 export const orderService = {
@@ -44,6 +48,17 @@ export const orderService = {
   },
   delete(id: number): Promise<void> {
     return apiRequest<void>(`/api/orders/${id}`, { method: 'DELETE' })
+  },
+
+  listPayments(orderId: number): Promise<OrderPayment[]> {
+    return apiRequest<OrderPayment[]>(`/api/orders/${orderId}/payments`)
+  },
+
+  addPayment(orderId: number, input: CreateOrderPaymentInput): Promise<Order> {
+    return apiRequest<Order>(`/api/orders/${orderId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   },
 }
 

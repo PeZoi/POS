@@ -2,6 +2,8 @@ package com.example.be.service;
 
 import com.example.be.dto.request.order.OrderCreateRequest;
 import com.example.be.dto.request.order.OrderUpdateRequest;
+import com.example.be.dto.request.order.OrderPaymentCreateRequest;
+import com.example.be.dto.response.order.OrderPaymentResponse;
 import com.example.be.dto.response.order.OrderResponse;
 import com.example.be.enums.OrderStatus;
 
@@ -19,6 +21,10 @@ public interface OrderService {
     OrderResponse update(Long id, OrderUpdateRequest request);
 
     OrderResponse updateCustomerName(Long id, String customerName);
+
+    OrderResponse addPayment(Long orderId, OrderPaymentCreateRequest request);
+
+    List<OrderPaymentResponse> listPayments(Long orderId);
 
     void delete(Long id);
 }

@@ -5,7 +5,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
-import { VitePWA } from 'vite-plugin-pwa'
+import { serwist } from '@serwist/vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -26,45 +26,17 @@ export default defineConfig(({ mode }) => {
     ...(useHttps ? [basicSsl()] : []),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icon-app.png'],
-      manifest: {
-        name: 'POS',
-        short_name: 'POS',
-        description: 'Ứng dụng bán hàng POS',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
-        display: 'standalone',
-        start_url: '/',
-        scope: '/',
-        icons: [
-          {
-            src: 'icon-app.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'icon-app.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: 'icon-app.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
-        navigateFallback: '/index.html',
-      },
+    serwist({
+      swSrc: 'src/sw.ts',
+      swDest: 'sw.js',
+      globDirectory: 'dist',
+      injectionPoint: 'self.__SW_MANIFEST',
+      rollupFormat: 'iife',
+      // Dev: cần HTTPS/localhost để SW hoạt động.
       devOptions: {
-        enabled: true,
-        type: 'module',
+        // Keep defaults; avoid bundling/minify changes unless needed.
+        bundle: false,
+        minify: false,
       },
     }),
   ],

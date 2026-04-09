@@ -21,6 +21,9 @@ import com.example.be.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +77,48 @@ public class OrderServiceImpl implements OrderService {
                 .stream()
                 .map(OrderMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public Slice<OrderResponse> page(
+            String q,
+            OrderStatus status,
+            Integer totalMin,
+            Integer totalMax,
+            int page,
+            int size,
+            Sort sort
+    ) {
+        String query = q == null ? "" : q.trim();
+        Long id = null;
+        Integer totalAmountEq = null;
+        if (query.matches("\\d+")) {
+            try {
+                long n = Long.parseLong(query);
+                id = n;
+                if (n >= 0 && n <= Integer.MAX_VALUE) {
+                    totalAmountEq = (int) n;
+                }
+            } catch (NumberFormatException ignored) {
+                id = null;
+            }
+        } else {
+            totalAmountEq = parseMoneyAmountFilter(query);
+        }
+
+        Integer min = totalMin != null && totalMin >= 0 ? totalMin : null;
+        Integer max = totalMax != null && totalMax >= 0 ? totalMax : null;
+        if (min != null && max != null && min > max) {
+            throw new BadRequestException("totalMin must be <= totalMax");
+        }
+
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 200);
+        Sort effectiveSort = sort == null || sort.isUnsorted() ? Sort.by(Sort.Direction.DESC, "id") : sort;
+        Pageable pageable = PageRequest.of(p, s, effectiveSort);
+
+        return orderRepository.pageWithItems(query, id, totalAmountEq, status, min, max, pageable)
+                .map(OrderMapper::toResponse);
     }
 
     /**

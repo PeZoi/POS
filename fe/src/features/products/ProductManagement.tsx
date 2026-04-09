@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, Trash2, Pencil, RotateCcw, Search } from 'lucide-react'
+import { Plus, Trash2, Pencil, RotateCcw, Search, Tag, Banknote, ArrowUpDown } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import type { CreateProductInput, Product } from '@/types/pos'
@@ -258,6 +258,14 @@ export function ProductManagement() {
     return 'bg-muted text-foreground'
   }, [])
 
+  const filterBadgeIcon = React.useCallback((key: string) => {
+    if (key === 'q') return Search
+    if (key === 'status') return Tag
+    if (key === 'price' || key === 'priceMin' || key === 'priceMax') return Banknote
+    if (key === 'sort') return ArrowUpDown
+    return null
+  }, [])
+
   const clearFilters = React.useCallback(() => {
     setSearchParams(
       (prev) => {
@@ -414,18 +422,24 @@ export function ProductManagement() {
 
           {filterBadges.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {filterBadges.map((b) => (
-                <Badge
-                  key={b.key}
-                  variant="secondary"
-                  className={cn(
-                    'max-w-full border',
-                    filterBadgeClass(b.key),
-                  )}
-                >
-                  <span className="truncate">{b.label}</span>
-                </Badge>
-              ))}
+              {filterBadges.map((b) => {
+                const Icon = filterBadgeIcon(b.key)
+                return (
+                  <Badge
+                    key={b.key}
+                    variant="secondary"
+                    className={cn(
+                      'max-w-full border',
+                      filterBadgeClass(b.key),
+                    )}
+                  >
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                      {Icon && <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />}
+                      <span className="truncate">{b.label}</span>
+                    </span>
+                  </Badge>
+                )
+              })}
             </div>
           )}
 

@@ -1,10 +1,11 @@
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
-  Clock,
+  CalendarClock,
   Filter,
-  Sparkles,
+  Hash,
   Tag,
+  User,
   Wallet,
   X,
 } from 'lucide-react'
@@ -23,10 +24,13 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/priceDigits'
+import type { OrderStatus } from '@/types/pos'
 
-export type StatusFilter = 'ACTIVE' | 'DELETED'
+export type OrderStatusFilter = 'ALL' | OrderStatus
+export type OrderSortBy = 'id' | 'totalAmount' | 'customerName' | 'createdAt'
+export type OrderSortDir = 'asc' | 'desc'
 
-export type ProductFiltersPanelProps = {
+export type OrderFiltersPanelProps = {
   open: boolean
   onToggleOpen: () => void
 
@@ -34,26 +38,26 @@ export type ProductFiltersPanelProps = {
   onClearFilters: () => void
   onApply: () => void
 
-  draftStatus: StatusFilter
-  onDraftStatusChange: (next: StatusFilter) => void
+  draftStatus: OrderStatusFilter
+  onDraftStatusChange: (next: OrderStatusFilter) => void
 
-  draftSortBy: string
-  onDraftSortByChange: (next: string) => void
-  draftSortDir: string
-  onDraftSortDirChange: (next: string) => void
+  draftSortBy: OrderSortBy
+  onDraftSortByChange: (next: OrderSortBy) => void
+  draftSortDir: OrderSortDir
+  onDraftSortDirChange: (next: OrderSortDir) => void
 
-  priceMinDraft: string
-  onPriceMinDraftChange: (next: string) => void
-  priceMaxDraft: string
-  onPriceMaxDraftChange: (next: string) => void
+  totalMinDraft: string
+  onTotalMinDraftChange: (next: string) => void
+  totalMaxDraft: string
+  onTotalMaxDraftChange: (next: string) => void
 
-  priceMinError: string | null
-  priceMaxError: string | null
-  priceRangeError: string | null
-  onValidatePriceDraft: () => void
+  totalMinError: string | null
+  totalMaxError: string | null
+  totalRangeError: string | null
+  onValidateTotalDraft: () => void
 }
 
-export function ProductFiltersPanel({
+export function OrderFiltersPanel({
   open,
   onToggleOpen,
   hasActiveFilters,
@@ -65,20 +69,20 @@ export function ProductFiltersPanel({
   onDraftSortByChange,
   draftSortDir,
   onDraftSortDirChange,
-  priceMinDraft,
-  onPriceMinDraftChange,
-  priceMaxDraft,
-  onPriceMaxDraftChange,
-  priceMinError,
-  priceMaxError,
-  priceRangeError,
-  onValidatePriceDraft,
-}: ProductFiltersPanelProps) {
+  totalMinDraft,
+  onTotalMinDraftChange,
+  totalMaxDraft,
+  onTotalMaxDraftChange,
+  totalMinError,
+  totalMaxError,
+  totalRangeError,
+  onValidateTotalDraft,
+}: OrderFiltersPanelProps) {
   const sortByDisplay = React.useMemo(() => {
-    if (draftSortBy === 'id') return { Icon: Sparkles, label: 'Mới nhất' }
-    if (draftSortBy === 'price') return { Icon: Wallet, label: 'Giá' }
-    if (draftSortBy === 'name') return { Icon: Tag, label: 'Tên' }
-    return { Icon: Clock, label: 'Ngày cập nhật' }
+    if (draftSortBy === 'id') return { Icon: Hash, label: 'Mới nhất' }
+    if (draftSortBy === 'totalAmount') return { Icon: Wallet, label: 'Tổng tiền' }
+    if (draftSortBy === 'customerName') return { Icon: User, label: 'Khách hàng' }
+    return { Icon: CalendarClock, label: 'Ngày tạo' }
   }, [draftSortBy])
 
   const sortDirDisplay = React.useMemo(() => {
@@ -88,9 +92,11 @@ export function ProductFiltersPanel({
   }, [draftSortDir])
 
   const statusDisplay = React.useMemo(() => {
-    return draftStatus === 'DELETED'
-      ? { Icon: Tag, label: 'Đã xoá' }
-      : { Icon: Tag, label: 'Đang bán' }
+    if (draftStatus === 'ALL') return { Icon: Tag, label: 'Tất cả' }
+    if (draftStatus === 'PENDING') return { Icon: Tag, label: 'Chờ thanh toán' }
+    if (draftStatus === 'PARTIALLY_PAID') return { Icon: Tag, label: 'Thanh toán 1 phần' }
+    if (draftStatus === 'PAID') return { Icon: Tag, label: 'Đã thanh toán' }
+    return { Icon: Tag, label: 'Đã huỷ' }
   }, [draftStatus])
 
   const SortByIcon = sortByDisplay.Icon
@@ -126,7 +132,7 @@ export function ProductFiltersPanel({
               size="icon"
               className="size-9 rounded-xl"
               aria-expanded={open}
-              aria-controls="product-filters-panel"
+              aria-controls="order-filters-panel"
               aria-label={open ? 'Đóng bộ lọc' : 'Mở bộ lọc'}
               onClick={onToggleOpen}
             >
@@ -137,13 +143,13 @@ export function ProductFiltersPanel({
       </CardHeader>
 
       <CardContent
-        id="product-filters-panel"
+        id="order-filters-panel"
         className={cn('gap-4 pt-0 sm:grid-cols-2', open ? 'grid' : 'hidden md:grid')}
       >
         <div className="grid gap-2">
           <Label>Sắp xếp</Label>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Select value={draftSortBy} onValueChange={onDraftSortByChange}>
+            <Select value={draftSortBy} onValueChange={(v) => onDraftSortByChange(v as OrderSortBy)}>
               <SelectTrigger className="h-10 w-full">
                 <SelectValue>
                   <span className="inline-flex min-w-0 items-center gap-2">
@@ -155,35 +161,31 @@ export function ProductFiltersPanel({
               <SelectContent>
                 <SelectItem value="id">
                   <span className="inline-flex items-center gap-2">
-                    <Sparkles className="size-4 text-muted-foreground" aria-hidden />
+                    <Hash className="size-4 text-muted-foreground" aria-hidden />
                     Mới nhất
                   </span>
                 </SelectItem>
-                <SelectItem value="price">
+                <SelectItem value="totalAmount">
                   <span className="inline-flex items-center gap-2">
                     <Wallet className="size-4 text-muted-foreground" aria-hidden />
-                    Giá
+                    Tổng tiền
                   </span>
                 </SelectItem>
-                <SelectItem value="name">
+                <SelectItem value="customerName">
                   <span className="inline-flex items-center gap-2">
-                    <Tag className="size-4 text-muted-foreground" aria-hidden />
-                    Tên
+                    <User className="size-4 text-muted-foreground" aria-hidden />
+                    Khách hàng
                   </span>
                 </SelectItem>
-                <SelectItem value="updatedAt">
+                <SelectItem value="createdAt">
                   <span className="inline-flex items-center gap-2">
-                    <Clock className="size-4 text-muted-foreground" aria-hidden />
-                    Ngày cập nhật
+                    <CalendarClock className="size-4 text-muted-foreground" aria-hidden />
+                    Ngày tạo
                   </span>
                 </SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={draftSortDir}
-              onValueChange={onDraftSortDirChange}
-              disabled={draftSortBy === 'id'}
-            >
+            <Select value={draftSortDir} onValueChange={(v) => onDraftSortDirChange(v as OrderSortDir)}>
               <SelectTrigger className="h-10 w-full">
                 <SelectValue>
                   <span className="inline-flex min-w-0 items-center gap-2">
@@ -212,7 +214,7 @@ export function ProductFiltersPanel({
 
         <div className="grid gap-2">
           <Label>Trạng thái</Label>
-          <Select value={draftStatus} onValueChange={(v) => onDraftStatusChange(v as StatusFilter)}>
+          <Select value={draftStatus} onValueChange={(v) => onDraftStatusChange(v as OrderStatusFilter)}>
             <SelectTrigger className="h-10 w-full">
               <SelectValue>
                 <span className="inline-flex min-w-0 items-center gap-2">
@@ -222,94 +224,108 @@ export function ProductFiltersPanel({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ACTIVE">
+              <SelectItem value="ALL">
                 <span className="inline-flex items-center gap-2">
                   <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đang bán
+                  Tất cả
                 </span>
               </SelectItem>
-              <SelectItem value="DELETED">
+              <SelectItem value="PENDING">
                 <span className="inline-flex items-center gap-2">
                   <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đã xoá
+                  Chờ thanh toán
+                </span>
+              </SelectItem>
+              <SelectItem value="PARTIALLY_PAID">
+                <span className="inline-flex items-center gap-2">
+                  <Tag className="size-4 text-muted-foreground" aria-hidden />
+                  Thanh toán 1 phần
+                </span>
+              </SelectItem>
+              <SelectItem value="PAID">
+                <span className="inline-flex items-center gap-2">
+                  <Tag className="size-4 text-muted-foreground" aria-hidden />
+                  Đã thanh toán
+                </span>
+              </SelectItem>
+              <SelectItem value="CANCELLED">
+                <span className="inline-flex items-center gap-2">
+                  <Tag className="size-4 text-muted-foreground" aria-hidden />
+                  Đã huỷ
                 </span>
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid gap-2">
-          <Label>Giá (VND)</Label>
+        <div className="grid gap-2 sm:col-span-2">
+          <Label>Tổng tiền (VND)</Label>
           <div className="grid gap-2">
             <div className="flex items-center gap-2">
               <Input
-                id="product-price-min"
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="Giá từ"
-                aria-invalid={Boolean(priceMinError || priceRangeError)}
+                placeholder="Từ"
+                aria-invalid={Boolean(totalMinError || totalRangeError)}
                 className={cn(
                   'tabular-nums',
-                  (priceMinError || priceRangeError) &&
+                  (totalMinError || totalRangeError) &&
                     'border-destructive focus-visible:ring-destructive/40',
                 )}
                 value={
-                  priceMinDraft === ''
+                  totalMinDraft === ''
                     ? ''
-                    : formatThousandsComma(stripLeadingZeros(digitsOnly(priceMinDraft)))
+                    : formatThousandsComma(stripLeadingZeros(digitsOnly(totalMinDraft)))
                 }
                 onChange={(e) => {
                   const next = stripLeadingZeros(digitsOnly(e.target.value))
-                  onPriceMinDraftChange(next)
+                  onTotalMinDraftChange(next)
                 }}
-                onBlur={() => onValidatePriceDraft()}
+                onBlur={() => onValidateTotalDraft()}
               />
               <span className="select-none text-sm text-muted-foreground">-</span>
               <Input
-                id="product-price-max"
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="Giá đến"
-                aria-invalid={Boolean(priceMaxError || priceRangeError)}
+                placeholder="Đến"
+                aria-invalid={Boolean(totalMaxError || totalRangeError)}
                 className={cn(
                   'tabular-nums',
-                  (priceMaxError || priceRangeError) &&
+                  (totalMaxError || totalRangeError) &&
                     'border-destructive focus-visible:ring-destructive/40',
                 )}
                 value={
-                  priceMaxDraft === ''
+                  totalMaxDraft === ''
                     ? ''
-                    : formatThousandsComma(stripLeadingZeros(digitsOnly(priceMaxDraft)))
+                    : formatThousandsComma(stripLeadingZeros(digitsOnly(totalMaxDraft)))
                 }
                 onChange={(e) => {
                   const next = stripLeadingZeros(digitsOnly(e.target.value))
-                  onPriceMaxDraftChange(next)
+                  onTotalMaxDraftChange(next)
                 }}
-                onBlur={() => onValidatePriceDraft()}
+                onBlur={() => onValidateTotalDraft()}
               />
             </div>
-
-            {(priceMinError || priceMaxError) && (
+            {(totalMinError || totalMaxError) && (
               <div className="grid gap-1">
-                {priceMinError && (
+                {totalMinError && (
                   <p className="text-xs text-destructive" role="alert">
-                    {priceMinError}
+                    {totalMinError}
                   </p>
                 )}
-                {priceMaxError && (
+                {totalMaxError && (
                   <p className="text-xs text-destructive" role="alert">
-                    {priceMaxError}
+                    {totalMaxError}
                   </p>
                 )}
               </div>
             )}
           </div>
-
-          {priceRangeError && (
+          {totalRangeError && (
             <p className="text-xs text-destructive" role="alert">
-              {priceRangeError}
+              {totalRangeError}
             </p>
           )}
         </div>

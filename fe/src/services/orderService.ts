@@ -1,6 +1,13 @@
 import type { Order, OrderPayment, OrderStatus } from '@/types/pos'
 import { apiRequest } from '@/services/apiClient'
 
+export type PageResponse<T> = {
+  items: T[]
+  page: number
+  size: number
+  hasNext: boolean
+}
+
 export type OrderItemCreate = {
   productId: number
   quantity: number
@@ -30,6 +37,28 @@ export const orderService = {
     params.set('limit', String(limit))
     if (status && status !== 'ALL') params.set('status', status)
     return apiRequest<Order[]>(`/api/orders/search?${params.toString()}`)
+  },
+  page(opts: {
+    q?: string
+    status?: OrderStatus | 'ALL' | null
+    totalMin?: number | null
+    totalMax?: number | null
+    sortBy?: 'id' | 'totalAmount' | 'customerName' | 'createdAt'
+    sortDir?: 'asc' | 'desc'
+    page?: number
+    size?: number
+  }): Promise<PageResponse<Order>> {
+    const params = new URLSearchParams()
+    const q = (opts.q ?? '').trim()
+    if (q) params.set('q', q)
+    if (opts.status && opts.status !== 'ALL') params.set('status', opts.status)
+    if (opts.totalMin != null) params.set('totalMin', String(opts.totalMin))
+    if (opts.totalMax != null) params.set('totalMax', String(opts.totalMax))
+    if (opts.sortBy) params.set('sortBy', opts.sortBy)
+    if (opts.sortDir) params.set('sortDir', opts.sortDir)
+    params.set('page', String(Math.max(0, Math.floor(opts.page ?? 0))))
+    params.set('size', String(Math.max(1, Math.floor(opts.size ?? 20))))
+    return apiRequest<PageResponse<Order>>(`/api/orders/page?${params.toString()}`)
   },
   getById(id: number): Promise<Order> {
     return apiRequest<Order>(`/api/orders/${id}`)

@@ -1,6 +1,7 @@
 package com.example.be.controller;
 
 import com.example.be.common.response.ApiResponse;
+import com.example.be.common.response.PageResponse;
 import com.example.be.dto.request.order.OrderCreateRequest;
 import com.example.be.dto.request.order.OrderCustomerNameRequest;
 import com.example.be.dto.request.order.OrderPaymentCreateRequest;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Sort;
 
 import com.example.be.enums.OrderStatus;
 import java.util.List;
@@ -40,6 +42,36 @@ public class OrderController {
             @RequestParam(name = "limit", required = false, defaultValue = "50") int limit
     ) {
         return ResponseEntity.ok(ApiResponse.success(orderService.search(q, status, limit)));
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "Page orders", description = "Filter + paging (slice) for infinity scroll.")
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> page(
+            @RequestParam(name = "q", required = false, defaultValue = "") String q,
+            @RequestParam(name = "status", required = false) OrderStatus status,
+            @RequestParam(name = "totalMin", required = false) Integer totalMin,
+            @RequestParam(name = "totalMax", required = false) Integer totalMax,
+            @RequestParam(name = "sortBy", required = false, defaultValue = "id") String sortBy,
+            @RequestParam(name = "sortDir", required = false, defaultValue = "desc") String sortDir,
+            @RequestParam(name = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "20") int size
+    ) {
+        String sb = sortBy == null ? "id" : sortBy.trim();
+        String sd = sortDir == null ? "desc" : sortDir.trim();
+
+        String property = switch (sb) {
+            case "totalAmount" -> "totalAmount";
+            case "customerName" -> "customerName";
+            case "createdAt" -> "createdAt";
+            case "id" -> "id";
+            default -> throw new com.example.be.exception.BadRequestException("sortBy not allowed: " + sb);
+        };
+        Sort.Direction dir = "asc".equalsIgnoreCase(sd) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort sort = Sort.by(dir, property).and(Sort.by(Sort.Direction.DESC, "id"));
+
+        var slice = orderService.page(q, status, totalMin, totalMax, page, size, sort);
+        var payload = new PageResponse<>(slice.getContent(), page, size, slice.hasNext());
+        return ResponseEntity.ok(ApiResponse.success(payload));
     }
 
     @PatchMapping("/{id}/customer-name")

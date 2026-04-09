@@ -6,6 +6,8 @@ import com.example.be.dto.request.order.OrderPaymentCreateRequest;
 import com.example.be.dto.response.order.OrderPaymentResponse;
 import com.example.be.dto.response.order.OrderResponse;
 import com.example.be.enums.OrderStatus;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -13,6 +15,16 @@ public interface OrderService {
     List<OrderResponse> list();
 
     List<OrderResponse> search(String q, OrderStatus status, int limit);
+
+    Slice<OrderResponse> page(
+            String q,
+            OrderStatus status,
+            Integer totalMin,
+            Integer totalMax,
+            int page,
+            int size,
+            Sort sort
+    );
 
     OrderResponse getById(Long id);
 

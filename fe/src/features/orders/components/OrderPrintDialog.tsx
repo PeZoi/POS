@@ -118,11 +118,6 @@ export function OrderPrintDialog({ open, onOpenChange, order, remainingAmount }:
       })
       .join('')
 
-    const itemsCount = (order.items ?? []).reduce(
-      (sum, it) => sum + Math.max(0, Math.floor(it.quantity ?? 0)),
-      0,
-    )
-
     const html = `<!doctype html>
 <html>
 <head>

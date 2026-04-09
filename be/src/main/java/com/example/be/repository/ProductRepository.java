@@ -1,6 +1,7 @@
 package com.example.be.repository;
 
 import com.example.be.entity.ProductEntity;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -55,5 +56,25 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
             ORDER BY p.id DESC
             """)
     List<ProductEntity> searchDeletedByNameOrBarcode(@Param("q") String q, Pageable pageable);
+
+    @Query("""
+            SELECT p FROM ProductEntity p
+            WHERE p.isDeleted = :deleted
+              AND (
+                :q = '' OR (
+                  LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%'))
+                  OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', :q, '%'))
+                )
+              )
+              AND (:priceMin IS NULL OR p.price >= :priceMin)
+              AND (:priceMax IS NULL OR p.price <= :priceMax)
+            """)
+    Slice<ProductEntity> pageFiltered(
+            @Param("deleted") boolean deleted,
+            @Param("q") String q,
+            @Param("priceMin") Integer priceMin,
+            @Param("priceMax") Integer priceMax,
+            Pageable pageable
+    );
 }
 

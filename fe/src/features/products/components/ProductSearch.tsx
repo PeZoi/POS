@@ -37,6 +37,9 @@ export type ProductSearchProps = {
 
   /** Nếu true, search trong nhóm đã xoá (soft-deleted) */
   deleted?: boolean
+
+  /** Gắn `id` cho ô input (dùng với `<Label htmlFor>`) */
+  inputId?: string
 }
 
 export function ProductSearch({
@@ -53,6 +56,7 @@ export function ProductSearch({
   formatVnd,
   onStateChange,
   deleted = false,
+  inputId,
 }: ProductSearchProps) {
   const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [open, setOpen] = React.useState(false)
@@ -155,6 +159,7 @@ export function ProductSearch({
             aria-hidden
           />
           <Input
+            id={inputId}
             type="search"
             autoComplete="off"
             autoCorrect="off"

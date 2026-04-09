@@ -9,8 +9,11 @@ import com.example.be.exception.NotFoundException;
 import com.example.be.mapper.ProductMapper;
 import com.example.be.repository.ProductRepository;
 import com.example.be.service.ProductService;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +57,27 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(ProductMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public Slice<ProductResponse> page(String q, boolean deleted, Integer priceMin, Integer priceMax, int page, int size, Sort sort) {
+        String trimmed = q == null ? "" : q.trim();
+        // Tránh ký tự đặc biệt của LIKE (%, _)
+        String safe = trimmed.replace("%", "").replace("_", "");
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 200);
+
+        Integer min = priceMin != null && priceMin >= 0 ? priceMin : null;
+        Integer max = priceMax != null && priceMax >= 0 ? priceMax : null;
+
+        if (min != null && max != null && min > max) {
+            throw new BadRequestException("priceMin must be <= priceMax");
+        }
+
+        Sort effectiveSort = sort == null || sort.isUnsorted() ? Sort.by(Sort.Direction.DESC, "id") : sort;
+        Pageable pageable = PageRequest.of(p, s, effectiveSort);
+        return productRepository.pageFiltered(deleted, safe, min, max, pageable)
+                .map(ProductMapper::toResponse);
     }
 
     @Override

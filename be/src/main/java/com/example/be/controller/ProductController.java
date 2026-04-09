@@ -1,6 +1,7 @@
 package com.example.be.controller;
 
 import com.example.be.common.response.ApiResponse;
+import com.example.be.common.response.PageResponse;
 import com.example.be.dto.request.product.ProductCreateRequest;
 import com.example.be.dto.request.product.ProductUpdateRequest;
 import com.example.be.dto.response.product.ProductResponse;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -40,6 +42,37 @@ public class ProductController {
             @RequestParam(value = "deleted", required = false, defaultValue = "false") boolean deleted
     ) {
         return ResponseEntity.ok(ApiResponse.success(productService.search(q, limit, deleted)));
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "Page products", description = "Filter + paging (slice) for infinity scroll.")
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> page(
+            @RequestParam(value = "q", required = false, defaultValue = "") String q,
+            @RequestParam(value = "deleted", required = false, defaultValue = "false") boolean deleted,
+            @RequestParam(value = "priceMin", required = false) Integer priceMin,
+            @RequestParam(value = "priceMax", required = false) Integer priceMax,
+            @RequestParam(value = "sortBy", required = false, defaultValue = "id") String sortBy,
+            @RequestParam(value = "sortDir", required = false, defaultValue = "desc") String sortDir,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "20") int size
+    ) {
+        String sb = sortBy == null ? "id" : sortBy.trim();
+        String sd = sortDir == null ? "desc" : sortDir.trim();
+
+        String property = switch (sb) {
+            case "price" -> "price";
+            case "name" -> "name";
+            case "updatedAt" -> "updatedAt";
+            case "id" -> "id";
+            default -> throw new com.example.be.exception.BadRequestException("sortBy not allowed: " + sb);
+        };
+
+        Sort.Direction dir = "asc".equalsIgnoreCase(sd) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort sort = Sort.by(dir, property).and(Sort.by(Sort.Direction.DESC, "id"));
+
+        var slice = productService.page(q, deleted, priceMin, priceMax, page, size, sort);
+        var payload = new PageResponse<>(slice.getContent(), page, size, slice.hasNext());
+        return ResponseEntity.ok(ApiResponse.success(payload));
     }
 
     @GetMapping("/{id}")

@@ -58,6 +58,15 @@ public class SettingServiceImpl implements SettingService {
         if (req.darkMode() != null) {
             e.setDarkMode(req.darkMode());
         }
+        if (req.telegramEnabled() != null) {
+            e.setTelegramEnabled(req.telegramEnabled());
+        }
+        if (req.backupEnabled() != null) {
+            e.setBackupEnabled(req.backupEnabled());
+        }
+        if (req.backupTime() != null) {
+            e.setBackupTime(req.backupTime());
+        }
 
         if (req.newPin() != null) {
             if (req.currentPin() == null) {
@@ -83,7 +92,11 @@ public class SettingServiceImpl implements SettingService {
                 Boolean.TRUE.equals(e.getEnableQr()),
                 Boolean.TRUE.equals(e.getEnableCard()),
                 Boolean.TRUE.equals(e.getEnablePrint()),
-                Boolean.TRUE.equals(e.getDarkMode())
+                Boolean.TRUE.equals(e.getDarkMode()),
+                Boolean.TRUE.equals(e.getTelegramEnabled()),
+                Boolean.TRUE.equals(e.getBackupEnabled()),
+                e.getBackupTime(),
+                e.getLastBackupAt()
         );
     }
 }

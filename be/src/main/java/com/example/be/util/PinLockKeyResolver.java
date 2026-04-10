@@ -20,7 +20,10 @@ public final class PinLockKeyResolver {
         return "i:" + resolveClientIp(request);
     }
 
-    private static String resolveClientIp(HttpServletRequest request) {
+    public static String resolveClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return "unknown";
+        }
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
             return xff.split(",")[0].trim();

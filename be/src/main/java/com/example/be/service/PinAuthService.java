@@ -5,5 +5,5 @@ import com.example.be.dto.response.auth.PinVerifyResponse;
 
 public interface PinAuthService {
 
-    PinVerifyResponse verify(PinVerifyRequest request, String clientLockKey);
+    PinVerifyResponse verify(PinVerifyRequest request, String clientLockKey, String clientIp);
 }

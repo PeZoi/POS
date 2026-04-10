@@ -8,6 +8,10 @@ export type Setting = {
   enableCard: boolean
   enablePrint: boolean
   darkMode: boolean
+  telegramEnabled: boolean
+  backupEnabled: boolean
+  backupTime: string
+  lastBackupAt: string | null
 }
 
 export type SettingUpdatePayload = {
@@ -16,6 +20,9 @@ export type SettingUpdatePayload = {
   enableCard?: boolean
   enablePrint?: boolean
   darkMode?: boolean
+  telegramEnabled?: boolean
+  backupEnabled?: boolean
+  backupTime?: string
   currentPin?: string
   newPin?: string
 }

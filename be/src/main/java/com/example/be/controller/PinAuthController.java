@@ -38,6 +38,7 @@ public class PinAuthController {
             @RequestHeader(value = PinLockKeyResolver.HEADER_DEVICE_ID, required = false) String deviceId
     ) {
         String lockKey = PinLockKeyResolver.resolveLockKey(httpRequest, deviceId);
-        return ResponseEntity.ok(ApiResponse.success(pinAuthService.verify(request, lockKey)));
+        String clientIp = PinLockKeyResolver.resolveClientIp(httpRequest);
+        return ResponseEntity.ok(ApiResponse.success(pinAuthService.verify(request, lockKey, clientIp)));
     }
 }

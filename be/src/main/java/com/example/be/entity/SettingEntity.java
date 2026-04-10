@@ -38,6 +38,21 @@ public class SettingEntity {
     @Column(name = "dark_mode", nullable = false)
     private Boolean darkMode = false;
 
+    @Column(name = "telegram_enabled", nullable = false)
+    private Boolean telegramEnabled = false;
+
+    @Column(name = "backup_enabled", nullable = false)
+    private Boolean backupEnabled = false;
+
+    /**
+     * HH:mm (00:00–23:59), chạy backup 1 lần/ngày.
+     */
+    @Column(name = "backup_time", nullable = false, length = 5)
+    private String backupTime = "02:00";
+
+    @Column(name = "last_backup_at")
+    private LocalDateTime lastBackupAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

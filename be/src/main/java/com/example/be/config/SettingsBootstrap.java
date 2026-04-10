@@ -28,6 +28,9 @@ public class SettingsBootstrap implements ApplicationRunner {
             e.setEnableCard(false);
             e.setEnablePrint(false);
             e.setDarkMode(false);
+            e.setTelegramEnabled(false);
+            e.setBackupEnabled(false);
+            e.setBackupTime("02:00");
             settingRepository.save(e);
         }
     }

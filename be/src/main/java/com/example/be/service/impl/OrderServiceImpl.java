@@ -18,6 +18,7 @@ import com.example.be.repository.OrderPaymentRepository;
 import com.example.be.repository.OrderRepository;
 import com.example.be.repository.ProductRepository;
 import com.example.be.service.OrderService;
+import com.example.be.service.TelegramNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +44,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderPaymentRepository orderPaymentRepository;
+    private final TelegramNotificationService telegramNotificationService;
 
     private static final SecureRandom RAND = new SecureRandom();
     private static final DateTimeFormatter ORDER_CODE_DATE = DateTimeFormatter.ofPattern("ddMMyy");
@@ -216,7 +218,9 @@ public class OrderServiceImpl implements OrderService {
 
         OrderEntity saved = orderRepository.save(order);
         OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
-        return OrderMapper.toResponse(full);
+        OrderResponse paidResp = OrderMapper.toResponse(full);
+        notifyTelegramPayment(paidResp, amount);
+        return paidResp;
     }
 
     @Override
@@ -257,7 +261,9 @@ public class OrderServiceImpl implements OrderService {
                 seedPaymentHistoryIfMissing(saved);
 
                 OrderEntity full = orderRepository.findWithItemsById(saved.getId()).orElse(saved);
-                return OrderMapper.toResponse(full);
+                OrderResponse created = OrderMapper.toResponse(full);
+                notifyTelegramOnCreate(created);
+                return created;
             } catch (DataIntegrityViolationException e) {
                 // Trùng mã hoá đơn (đa luồng / hiếm) — random lại 3 số cuối và thử lưu tiếp
                 if (saveAttempt == maxSaveAttempts - 1) {
@@ -339,6 +345,36 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public void delete(Long id) {
         throw new BadRequestException("Hoá đơn không được xoá. Vui lòng huỷ hoá đơn nếu cần.");
+    }
+
+    private void notifyTelegramOnCreate(OrderResponse r) {
+        int total = r.totalAmount() == null ? 0 : Math.max(0, r.totalAmount());
+        int paid = r.paidAmount() == null ? 0 : Math.max(0, r.paidAmount());
+
+        // Chỉ thông báo "hoá đơn mới" khi chưa thanh toán để tránh spam.
+        if (paid <= 0 && r.status() == OrderStatus.PENDING) {
+            telegramNotificationService.notifyNewOrderPending(r.id(), r.orderCode(), total, r.status());
+        }
+
+        if (paid > 0) {
+            boolean paidInFull = total > 0 && paid >= total;
+            telegramNotificationService.notifyPaymentSuccess(
+                    r.id(), r.orderCode(), paid, paid, total, r.status(), paidInFull);
+        }
+    }
+
+    private void notifyTelegramPayment(OrderResponse r, int paymentAmountThisTime) {
+        int total = r.totalAmount() == null ? 0 : Math.max(0, r.totalAmount());
+        int newPaid = r.paidAmount() == null ? 0 : Math.max(0, r.paidAmount());
+        boolean paidInFull = total > 0 && newPaid >= total;
+        telegramNotificationService.notifyPaymentSuccess(
+                r.id(),
+                r.orderCode(),
+                paymentAmountThisTime,
+                newPaid,
+                total,
+                r.status(),
+                paidInFull);
     }
 
     private OrderStatus resolveStatus(int total, int paid, OrderStatus current) {

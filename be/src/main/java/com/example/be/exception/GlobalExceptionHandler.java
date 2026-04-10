@@ -3,6 +3,9 @@ package com.example.be.exception;
 import com.example.be.common.response.ApiResponse;
 import com.example.be.common.response.ResponseCode;
 import com.example.be.dto.response.auth.PinLockErrorPayload;
+import com.example.be.service.TelegramNotificationService;
+import com.example.be.util.PinLockKeyResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -14,6 +17,12 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final TelegramNotificationService telegramNotificationService;
+
+    public GlobalExceptionHandler(TelegramNotificationService telegramNotificationService) {
+        this.telegramNotificationService = telegramNotificationService;
+    }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NotFoundException ex) {
@@ -56,7 +65,13 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex) {
+    public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex, HttpServletRequest request) {
+        telegramNotificationService.notifyServerErrorAsync(
+                ex,
+                request.getMethod(),
+                request.getRequestURI(),
+                PinLockKeyResolver.resolveClientIp(request)
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(ResponseCode.INTERNAL_ERROR, "Internal error", 500));
     }

@@ -11,6 +11,13 @@ public record SettingUpdateRequest(
         Boolean enableCard,
         Boolean enablePrint,
         Boolean darkMode,
+        @Schema(description = "Bật/tắt gửi thông báo Telegram (cần cấu hình bot token + chat id trên server)")
+        Boolean telegramEnabled,
+        @Schema(description = "Bật/tắt backup SQL (mysqldump) mỗi ngày")
+        Boolean backupEnabled,
+        @Schema(description = "Giờ chạy backup mỗi ngày (HH:mm), ví dụ 02:00")
+        @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d$", message = "backupTime must be HH:mm (00:00-23:59)")
+        String backupTime,
         @Pattern(regexp = "^\\d{4}$", message = "newPin must be 4 digits")
         String newPin,
         @Pattern(regexp = "^\\d{4}$", message = "currentPin must be 4 digits")

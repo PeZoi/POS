@@ -11,6 +11,7 @@ import com.example.be.repository.PinClientLockRepository;
 import com.example.be.repository.SettingRepository;
 import com.example.be.service.PinAuthService;
 import com.example.be.service.PosSessionTokenService;
+import com.example.be.service.TelegramNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +30,7 @@ public class PinAuthServiceImpl implements PinAuthService {
     private final PinClientLockRepository pinClientLockRepository;
     private final PasswordEncoder passwordEncoder;
     private final PosSessionTokenService posSessionTokenService;
+    private final TelegramNotificationService telegramNotificationService;
 
     @Value("${pos.session.ttl-seconds:43200}")
     private long sessionTtlSeconds;
@@ -43,7 +45,7 @@ public class PinAuthServiceImpl implements PinAuthService {
     @Transactional(
             noRollbackFor = {UnauthorizedException.class, PinLockedException.class}
     )
-    public PinVerifyResponse verify(PinVerifyRequest request, String clientLockKey) {
+    public PinVerifyResponse verify(PinVerifyRequest request, String clientLockKey, String clientIp) {
         SettingEntity settings = settingRepository.findById(SettingEntity.SINGLETON_ID)
                 .orElseThrow(() -> new NotFoundException("Settings not initialized"));
 
@@ -78,6 +80,12 @@ public class PinAuthServiceImpl implements PinAuthService {
                 lock.setLockedUntil(now.plusMinutes(lockDurationMinutes));
                 lock.setFailedAttempts(0);
                 pinClientLockRepository.save(lock);
+                telegramNotificationService.notifyPinLocked(
+                        clientIp,
+                        clientLockKey,
+                        maxFailedAttempts,
+                        lockDurationMinutes
+                );
                 long seconds = Math.max(1L, ChronoUnit.SECONDS.between(now, lock.getLockedUntil()));
                 throw new PinLockedException(
                         "Đã nhập sai " + maxFailedAttempts + " lần. Thiết bị này bị khóa " + lockDurationMinutes + " phút.",

@@ -2,13 +2,14 @@ package com.example.be.repository;
 
 import com.example.be.entity.OrderEntity;
 import com.example.be.enums.OrderStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +19,9 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
 
     boolean existsByOrderCode(String orderCode);
 
-    @EntityGraph(attributePaths = {"items", "items.product"})
+    /**
+     * Phân trang root {@link OrderEntity}, không fetch collection (tránh HHH90003004).
+     */
     @Query("""
             select o from OrderEntity o
             where (:status is null or o.status = :status)
@@ -30,9 +33,8 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
                     or (:totalAmountEq is not null and o.totalAmount = :totalAmountEq)
                     or (o.customerName is not null and lower(o.customerName) like lower(concat('%', :q, '%')))
                   )
-            order by o.id desc
             """)
-    List<OrderEntity> searchWithItems(
+    Slice<OrderEntity> searchOrdersSlice(
             @Param("q") String q,
             @Param("id") Long id,
             @Param("totalAmountEq") Integer totalAmountEq,
@@ -40,7 +42,9 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"items", "items.product"})
+    /**
+     * Phân trang root {@link OrderEntity} (có lọc tổng), không fetch collection (tránh HHH90003004).
+     */
     @Query("""
             select o from OrderEntity o
             where (:status is null or o.status = :status)
@@ -55,7 +59,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
               and (:totalMin is null or o.totalAmount >= :totalMin)
               and (:totalMax is null or o.totalAmount <= :totalMax)
             """)
-    Slice<OrderEntity> pageWithItems(
+    Slice<OrderEntity> pageOrdersSlice(
             @Param("q") String q,
             @Param("id") Long id,
             @Param("totalAmountEq") Integer totalAmountEq,
@@ -64,5 +68,15 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
             @Param("totalMax") Integer totalMax,
             Pageable pageable
     );
-}
 
+    /**
+     * Batch-load items + product theo danh sách id (không dùng LIMIT; id đã được phân trang ở bước trước).
+     */
+    @Query("""
+            select distinct o from OrderEntity o
+            left join fetch o.items it
+            left join fetch it.product
+            where o.id in :ids
+            """)
+    List<OrderEntity> findAllWithItemsByIdIn(@Param("ids") Collection<Long> ids);
+}

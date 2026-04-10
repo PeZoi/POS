@@ -32,6 +32,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -73,9 +76,16 @@ public class OrderServiceImpl implements OrderService {
         }
 
         int safeLimit = Math.max(1, Math.min(limit, 200));
-        return orderRepository.searchWithItems(query, id, totalAmountEq, status, PageRequest.of(0, safeLimit))
-                .stream()
-                .map(OrderMapper::toResponse)
+        Pageable pageable = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "id"));
+        Slice<OrderEntity> slice = orderRepository.searchOrdersSlice(query, id, totalAmountEq, status, pageable);
+        List<OrderEntity> thin = slice.getContent();
+        if (thin.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, OrderEntity> byId = loadOrdersWithItemsByIds(
+                thin.stream().map(OrderEntity::getId).toList());
+        return thin.stream()
+                .map(o -> OrderMapper.toResponse(byId.get(o.getId())))
                 .toList();
     }
 
@@ -117,8 +127,19 @@ public class OrderServiceImpl implements OrderService {
         Sort effectiveSort = sort == null || sort.isUnsorted() ? Sort.by(Sort.Direction.DESC, "id") : sort;
         Pageable pageable = PageRequest.of(p, s, effectiveSort);
 
-        return orderRepository.pageWithItems(query, id, totalAmountEq, status, min, max, pageable)
-                .map(OrderMapper::toResponse);
+        Slice<OrderEntity> thinSlice = orderRepository.pageOrdersSlice(
+                query, id, totalAmountEq, status, min, max, pageable);
+        Map<Long, OrderEntity> byId = loadOrdersWithItemsByIds(
+                thinSlice.getContent().stream().map(OrderEntity::getId).toList());
+        return thinSlice.map(o -> OrderMapper.toResponse(byId.get(o.getId())));
+    }
+
+    private Map<Long, OrderEntity> loadOrdersWithItemsByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        return orderRepository.findAllWithItemsByIdIn(ids).stream()
+                .collect(Collectors.toMap(OrderEntity::getId, Function.identity()));
     }
 
     /**

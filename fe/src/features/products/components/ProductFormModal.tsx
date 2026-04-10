@@ -147,7 +147,6 @@ function validate(input: CreateProductInput) {
   const errors: Partial<Record<keyof CreateProductInput, string>> = {}
 
   if (normalize(input.name).length === 0) errors.name = 'Vui lòng nhập tên sản phẩm.'
-  if (normalize(input.barcode).length === 0) errors.barcode = 'Vui lòng nhập barcode.'
   if (!Number.isInteger(input.price) || input.price < 0)
     errors.price = 'Giá phải là số nguyên không âm.'
 
@@ -255,7 +254,19 @@ export function ProductFormModal({
     if (Object.keys(errors).length > 0) return
 
     if (!editing) {
-      await onCreate(formValue)
+      const resolvedBarcode =
+        barcodeNorm.length > 0
+          ? formValue.barcode.trim()
+          : `MANUAL-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
+      const name = formValue.name.trim().length > 0 ? formValue.name.trim() : `SP ${resolvedBarcode.slice(-6)}`
+
+      await onCreate({
+        ...formValue,
+        name,
+        barcode: resolvedBarcode,
+        isAutoCreated: barcodeNorm.length === 0 ? true : formValue.isAutoCreated,
+      })
       onOpenChange(false)
       return
     }

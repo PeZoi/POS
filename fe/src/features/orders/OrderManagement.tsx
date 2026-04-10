@@ -402,9 +402,11 @@ export function OrderManagement() {
   }, [])
 
   const clearFilters = React.useCallback(() => {
+    setSearchText('')
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev)
+        p.delete('q')
         p.delete('status')
         p.delete('totalMin')
         p.delete('totalMax')

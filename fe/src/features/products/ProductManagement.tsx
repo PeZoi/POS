@@ -267,9 +267,11 @@ export function ProductManagement() {
   }, [])
 
   const clearFilters = React.useCallback(() => {
+    setSearchText('')
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev)
+        p.delete('q')
         p.delete('status')
         p.delete('priceMin')
         p.delete('priceMax')

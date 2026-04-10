@@ -167,6 +167,7 @@ public class TelegramNotificationService {
         sb.append("📊 Đã trả (lũy kế): ").append(formatMoney(totalAfter)).append(" / ").append(formatMoney(orderTotal)).append("\n");
         sb.append(paidInFull ? "✅ Đã thanh toán đủ\n" : "⏳ Thanh toán một phần\n");
         sb.append("📌 Trạng thái: ").append(status != null ? status.name() : "?").append("\n");
+        sb.append("-----------------------------\n");
         sb.append("⏰ ").append(LocalDateTime.now().format(TIME));
         sendPlainTextAsync(sb.toString());
     }

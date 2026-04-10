@@ -2,6 +2,7 @@ package com.example.be.exception;
 
 import com.example.be.common.response.ApiResponse;
 import com.example.be.common.response.ResponseCode;
+import com.example.be.dto.response.auth.PinLockErrorPayload;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -24,6 +25,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ResponseCode.VALIDATION_ERROR, ex.getMessage(), 400));
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ResponseCode.UNAUTHORIZED, ex.getMessage(), 401));
+    }
+
+    @ExceptionHandler(PinLockedException.class)
+    public ResponseEntity<ApiResponse<PinLockErrorPayload>> handlePinLocked(PinLockedException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(
+                        ResponseCode.PIN_LOCKED,
+                        ex.getMessage(),
+                        429,
+                        new PinLockErrorPayload(ex.getRetryAfterSeconds())
+                ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

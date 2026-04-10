@@ -28,5 +28,9 @@ public record ApiResponse<T>(
     public static <T> ApiResponse<T> error(ResponseCode code, String message, int status) {
         return new ApiResponse<>(code.name(), message, status, null, LocalDateTime.now());
     }
+
+    public static <T> ApiResponse<T> error(ResponseCode code, String message, int status, T data) {
+        return new ApiResponse<>(code.name(), message, status, data, LocalDateTime.now());
+    }
 }
 

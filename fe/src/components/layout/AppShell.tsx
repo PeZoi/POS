@@ -3,6 +3,7 @@ import * as React from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
+import { useSettingsStore } from '@/store/settingsStore'
 
 type NavItem = {
   to: string
@@ -40,6 +41,7 @@ export function AppShell() {
   const leftItems = navItems.slice(0, 2)
   const rightItems = navItems.slice(2)
   const navigate = useNavigate()
+  const storeName = useSettingsStore((s) => s.settings?.storeName ?? s.publicPreview?.storeName ?? 'POS')
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-6 sm:py-6">
@@ -48,9 +50,7 @@ export function AppShell() {
             <div className="rounded-2xl border bg-card p-3 shadow-xs">
               <div className="px-2 py-2">
                 <div className="text-sm font-semibold">POS</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Cửa hàng đồ chơi Quế Hường
-                </div>
+                <div className="mt-1 text-xs text-muted-foreground">{storeName}</div>
               </div>
               <nav className="mt-2 grid gap-1">
                 {navItems.map((it) => (

@@ -7,6 +7,8 @@ public enum ResponseCode {
     DELETED,
     VALIDATION_ERROR,
     NOT_FOUND,
+    UNAUTHORIZED,
+    PIN_LOCKED,
     INTERNAL_ERROR
 }
 

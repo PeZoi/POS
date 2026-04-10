@@ -44,6 +44,38 @@ export function paidAmountLabel(paidAmount: number | null | undefined, totalAmou
   return formatVnd(paid)
 }
 
+export function paymentSuccessToast(opts: {
+  amount: number
+  paidBefore: number | null | undefined
+  totalBefore: number | null | undefined
+}) {
+  const amount = Math.max(0, Math.floor(opts.amount))
+  const paidBefore = Math.max(0, Math.floor(opts.paidBefore ?? 0))
+  const totalBefore = Math.max(0, Math.floor(opts.totalBefore ?? 0))
+  const remainBefore = Math.max(0, totalBefore - paidBefore)
+
+  const isSettlingAllRemaining = remainBefore > 0 && amount === remainBefore
+  const isFullOnFirstPayment = isSettlingAllRemaining && paidBefore === 0
+  const isPayingRemainingAfterPartial = isSettlingAllRemaining && paidBefore > 0
+
+  if (isFullOnFirstPayment) {
+    return {
+      title: 'Thanh toán đầy đủ',
+      description: `Đã thanh toán toàn bộ hoá đơn: ${formatVnd(amount)}`,
+    }
+  }
+  if (isPayingRemainingAfterPartial) {
+    return {
+      title: 'Thanh toán phần còn lại',
+      description: `Đã thanh toán nốt: ${formatVnd(amount)}`,
+    }
+  }
+  return {
+    title: 'Thanh toán 1 phần',
+    description: `Đã ghi nhận ${formatVnd(amount)}`,
+  }
+}
+
 export function parseMoneyParam(raw: string | null): number | null {
   if (raw == null || raw.trim() === '') return null
   const n = Number(String(raw).replace(/\s/g, ''))

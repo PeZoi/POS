@@ -4,18 +4,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { Order } from '@/types/pos'
 import { useOrders } from '@/features/orders/hooks/useOrders'
-import { useProducts } from '@/features/products/hooks/useProducts'
-import { orderService, type CreateOrderInput } from '@/services/orderService'
+import { orderService } from '@/services/orderService'
 import { Button } from '@/components/ui/button'
-import { Modal } from '@/components/ui/modal'
 import { ApiError } from '@/services/apiClient'
 import { toast } from 'sonner'
 import { OrderPaymentDialog } from '@/features/orders/components/OrderPaymentDialog'
 import { OrdersToolbar } from '@/features/orders/components/OrdersToolbar'
 import { OrdersListDesktop } from '@/features/orders/components/OrdersListDesktop'
 import { OrdersListMobile } from '@/features/orders/components/OrdersListMobile'
-import { OrderForm, emptyOrderForm, validateOrderForm, type OrderFormValue } from '@/features/orders/components/OrderForm'
-import { formatVnd } from '@/features/orders/orderManagementUtils'
+import { formatVnd, paymentSuccessToast } from '@/features/orders/orderManagementUtils'
 
 export function OrderManagement() {
   const navigate = useNavigate()
@@ -42,8 +39,6 @@ export function OrderManagement() {
     items: orders,
     loading,
     error,
-    create,
-    update,
     reload,
     hasNext,
     loadMore,
@@ -65,7 +60,6 @@ export function OrderManagement() {
     sortDir: appliedSortDir === 'asc' ? 'asc' : 'desc',
     size: 20,
   })
-  const { items: products, loading: productsLoading, error: productsError } = useProducts()
 
   const loadMoreRef = React.useRef<HTMLDivElement | null>(null)
 
@@ -85,17 +79,9 @@ export function OrderManagement() {
     )
   }, [setSearchParams])
 
-  const [editing, setEditing] = React.useState<Order | null>(null)
-  const [formOpen, setFormOpen] = React.useState(false)
-
   const [payTarget, setPayTarget] = React.useState<Order | null>(null)
   const [payOpen, setPayOpen] = React.useState(false)
   const [paySubmitting, setPaySubmitting] = React.useState(false)
-
-  const [formValue, setFormValue] = React.useState<OrderFormValue>(emptyOrderForm)
-  const [formErrors, setFormErrors] = React.useState<
-    Partial<Record<keyof OrderFormValue, string>>
-  >({})
 
   React.useEffect(() => {
     const el = loadMoreRef.current
@@ -114,49 +100,11 @@ export function OrderManagement() {
   }, [loadMore])
 
   const openCreate = () => {
-    setEditing(null)
-    setFormValue(emptyOrderForm)
-    setFormErrors({})
-    setFormOpen(true)
+    navigate('/cart')
   }
 
   const openEdit = (o: Order) => {
-    setEditing(o)
-    setFormValue({
-      status: o.status ?? 'PENDING',
-      items:
-        o.items && o.items.length > 0
-          ? o.items.map((it) => ({ productId: it.productId, quantity: it.quantity }))
-          : [{ productId: null, quantity: 1 }],
-    })
-    setFormErrors({})
-    setFormOpen(true)
-  }
-
-  const closeForm = () => {
-    setFormOpen(false)
-    setEditing(null)
-  }
-
-  const submitForm = async () => {
-    const errors = validateOrderForm(formValue)
-    setFormErrors(errors)
-    if (Object.keys(errors).length > 0) return
-
-    const input: CreateOrderInput = {
-      status: formValue.status,
-      items: formValue.items
-        .filter((it) => it.productId != null)
-        .map((it) => ({ productId: it.productId as number, quantity: it.quantity })),
-    }
-
-    if (!editing) {
-      await create(input)
-    } else {
-      await update(editing.id, input)
-      setEditing(null)
-    }
-    setFormOpen(false)
+    navigate(`/orders/${o.id}/edit`)
   }
 
   const openPayFromList = React.useCallback((o: Order) => {
@@ -183,7 +131,12 @@ export function OrderManagement() {
     setPaySubmitting(true)
     try {
       await orderService.addPayment(payTarget.id, { amount, note: payload.note ?? null })
-      toast.success('Thanh toán thành công', { description: `Đã ghi nhận ${formatVnd(amount)}` })
+      const meta = paymentSuccessToast({
+        amount,
+        paidBefore: payTarget.paidAmount,
+        totalBefore: payTarget.totalAmount,
+      })
+      toast.success(meta.title, { description: meta.description })
       setPayOpen(false)
       setPayTarget(null)
       await reload()
@@ -213,9 +166,9 @@ export function OrderManagement() {
         </div>
       </div>
 
-      {(error || productsError) && (
+      {error && (
         <div className="rounded-2xl border bg-destructive/5 p-3 text-sm text-destructive">
-          {error ?? productsError}
+          {error}
         </div>
       )}
 
@@ -245,33 +198,6 @@ export function OrderManagement() {
       >
         {hasNext && (loading ? 'Đang tải…' : 'Đang tải thêm hoá đơn…')}
       </div>
-
-      <Modal
-        open={formOpen}
-        onOpenChange={(o) => {
-          if (!o) closeForm()
-        }}
-        title={editing ? `Sửa hoá đơn #${editing?.orderCode ?? String(editing?.id)}` : 'Tạo hoá đơn'}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={closeForm}>
-              Huỷ
-            </Button>
-            <Button onClick={submitForm}>{editing ? 'Cập nhật' : 'Tạo hoá đơn'}</Button>
-          </div>
-        }
-        size="lg"
-      >
-        <OrderForm
-          value={formValue}
-          onChange={setFormValue}
-          errors={formErrors}
-          products={products}
-        />
-        {productsLoading && (
-          <div className="mt-3 text-sm text-muted-foreground">Đang tải danh sách sản phẩm…</div>
-        )}
-      </Modal>
 
       <OrderPaymentDialog
         open={payOpen}

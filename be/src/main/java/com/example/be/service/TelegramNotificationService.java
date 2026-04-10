@@ -146,6 +146,7 @@ public class TelegramNotificationService {
         sb.append("🧮 Tổng: ").append(formatMoney(orderTotal)).append("\n");
         sb.append("⏳ Chưa thanh toán\n");
         sb.append("📌 Trạng thái: ").append(status != null ? status.name() : "?").append("\n");
+        sb.append("-----------------------------\n");
         sb.append("⏰ ").append(LocalDateTime.now().format(TIME));
         sendPlainTextAsync(sb.toString());
     }
@@ -159,13 +160,26 @@ public class TelegramNotificationService {
             OrderStatus status,
             boolean paidInFull
     ) {
+        int paidBefore = Math.max(0, totalAfter - paymentAmount);
+        int remainBefore = Math.max(0, orderTotal - paidBefore);
+        boolean settlesAllRemaining = remainBefore > 0 && paymentAmount == remainBefore;
+        boolean isFullOnFirstPayment = settlesAllRemaining && paidBefore == 0;
+        boolean isPayingRemainingAfterPartial = settlesAllRemaining && paidBefore > 0;
+
         StringBuilder sb = new StringBuilder();
         sb.append("💰 [").append(safe(telegramProperties.getEnv(), "local").toUpperCase()).append("][THANH TOÁN]\n");
         sb.append("-----------------------------\n");
         sb.append("🧾 Mã HĐ: ").append(safe(orderCode, String.valueOf(orderId))).append("\n");
         sb.append("➕ Số tiền lần này: ").append(formatMoney(paymentAmount)).append("\n");
         sb.append("📊 Đã trả (lũy kế): ").append(formatMoney(totalAfter)).append(" / ").append(formatMoney(orderTotal)).append("\n");
-        sb.append(paidInFull ? "✅ Đã thanh toán đủ\n" : "⏳ Thanh toán một phần\n");
+        if (isFullOnFirstPayment) {
+            sb.append("✅ Thanh toán đầy đủ (trả hết ngay)\n");
+        } else if (isPayingRemainingAfterPartial) {
+            sb.append("✅ Thanh toán phần còn lại\n");
+        } else {
+            // fallback: tương thích logic cũ nếu nơi gọi chỉ biết paidInFull
+            sb.append(paidInFull ? "✅ Đã thanh toán đủ\n" : "⏳ Thanh toán một phần\n");
+        }
         sb.append("📌 Trạng thái: ").append(status != null ? status.name() : "?").append("\n");
         sb.append("-----------------------------\n");
         sb.append("⏰ ").append(LocalDateTime.now().format(TIME));

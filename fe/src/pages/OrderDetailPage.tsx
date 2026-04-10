@@ -162,7 +162,16 @@ export function OrderDetailPage() {
     setPaySubmitting(true)
     try {
       await orderService.addPayment(orderId, { amount, note: payload.note ?? null })
-      toast.success('Thanh toán thành công', { description: `Đã ghi nhận ${formatVnd(amount)}` })
+      const paidBefore = order.paidAmount ?? 0
+      const totalBefore = order.totalAmount ?? 0
+      const remainBefore = Math.max(0, totalBefore - paidBefore)
+      if (remainBefore > 0 && amount === remainBefore && paidBefore <= 0) {
+        toast.success('Thanh toán đầy đủ', { description: `Đã thanh toán toàn bộ hoá đơn: ${formatVnd(amount)}` })
+      } else if (remainBefore > 0 && amount === remainBefore && paidBefore > 0) {
+        toast.success('Thanh toán phần còn lại', { description: `Đã thanh toán nốt: ${formatVnd(amount)}` })
+      } else {
+        toast.success('Thanh toán 1 phần', { description: `Đã ghi nhận ${formatVnd(amount)}` })
+      }
 
       setPayOpen(false)
 

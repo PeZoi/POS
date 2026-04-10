@@ -6,6 +6,7 @@ import { PosSessionGate } from '@/features/auth/pin/PosSessionGate'
 import CartPage from '@/pages/CartPage'
 import CartPreviewPage from '@/pages/CartPreviewPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { OrderEditPage } from '@/pages/OrderEditPage'
 import { OrderDetailPage } from '@/pages/OrderDetailPage'
 import { OrdersPage } from '@/pages/OrdersPage'
 import { ProductsPage } from '@/pages/ProductsPage'
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:id/edit" element={<OrderEditPage />} />
             <Route path="/orders/:id" element={<OrderDetailPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

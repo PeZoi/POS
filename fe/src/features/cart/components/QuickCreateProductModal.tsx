@@ -11,6 +11,8 @@ type QuickCreateProductModalProps = {
   open: boolean
   /** Có sẵn từ quét; null = thêm thủ công — không có barcode, hệ thống tạo mã nội bộ. */
   barcode: string | null
+  /** Prefill tên sản phẩm khi user vừa search nhưng không có kết quả. */
+  initialName?: string | null
   initialError: string | null
   onOpenChange: (open: boolean) => void
   onCreateProduct: (input: CreateProductInput) => Promise<void>
@@ -19,6 +21,7 @@ type QuickCreateProductModalProps = {
 export function QuickCreateProductModal({
   open,
   barcode,
+  initialName,
   initialError,
   onOpenChange,
   onCreateProduct,
@@ -58,10 +61,10 @@ export function QuickCreateProductModal({
 
   React.useEffect(() => {
     if (!open) return
-    setDraftName('')
+    setDraftName(barcode ? '' : (initialName?.trim() ?? ''))
     setDraftPriceRaw('')
     setError(initialError)
-  }, [open, initialError, barcode])
+  }, [open, initialError, barcode, initialName])
 
   React.useEffect(() => {
     if (!open) return

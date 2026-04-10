@@ -32,10 +32,12 @@ export default function CartPayment() {
 
   const [createOpen, setCreateOpen] = React.useState(false)
   const [pendingBarcode, setPendingBarcode] = React.useState<string | null>(null)
+  const [pendingInitialName, setPendingInitialName] = React.useState<string | null>(null)
   const [scanError, setScanError] = React.useState<string | null>(null)
   const [scannerMode, setScannerMode] = React.useState<ScannerModeId>('scanbot')
   const [scannerPanelActive, setScannerPanelActive] = React.useState(false)
   const scannerPanelWrapRef = React.useRef<HTMLDivElement | null>(null)
+  const [productSearchQuery, setProductSearchQuery] = React.useState('')
 
   // iOS Safari/back-forward cache: đảm bảo dừng camera khi rời trang (tránh crash/reload ngẫu nhiên).
   React.useEffect(() => {
@@ -99,6 +101,7 @@ export default function CartPayment() {
   const openCreatePopup = React.useCallback((barcode: string | null, initialError?: string) => {
     setPendingBarcode(barcode)
     setScanError(initialError ?? null)
+    setPendingInitialName(null)
     setCreateOpen(true)
     setScanningLocked(true)
 
@@ -106,6 +109,21 @@ export default function CartPayment() {
       scanProcessingResolveRef.current = resolve
     })
   }, [])
+
+  const openManualCreatePopup = React.useCallback(
+    (opts: { initialName?: string }) => {
+      setPendingBarcode(null)
+      setScanError(null)
+      setPendingInitialName(opts.initialName?.trim() ? opts.initialName.trim() : null)
+      setCreateOpen(true)
+      setScanningLocked(true)
+
+      return new Promise<void>((resolve) => {
+        scanProcessingResolveRef.current = resolve
+      })
+    },
+    [],
+  )
 
   const addProductToCart = React.useCallback(
     (product: Product) => {
@@ -126,6 +144,7 @@ export default function CartPayment() {
     async (payload: CreateProductInput) => {
       const created = await productService.create(payload)
       addProductToCart(created)
+      setProductSearchQuery('')
     },
     [addProductToCart],
   )
@@ -135,6 +154,7 @@ export default function CartPayment() {
       if (o) return
       setCreateOpen(false)
       setPendingBarcode(null)
+      setPendingInitialName(null)
       setScanError(null)
       setScanningLocked(false)
       finishScanProcessing()
@@ -185,8 +205,10 @@ export default function CartPayment() {
       <div className="flex min-w-0 flex-col gap-2">
         <CartProductSearch
           onPickProduct={addProductToCart}
-          onQuickAdd={() => void openCreatePopup(null)}
+          onQuickAdd={(opts) => void openManualCreatePopup(opts)}
           formatVnd={formatVnd}
+          value={productSearchQuery}
+          onValueChange={setProductSearchQuery}
         />
         <div ref={scannerPanelWrapRef}>
           <EmbeddedBarcodeScannerSection
@@ -293,6 +315,7 @@ export default function CartPayment() {
       <QuickCreateProductModal
         open={createOpen}
         barcode={pendingBarcode}
+        initialName={pendingInitialName}
         initialError={scanError}
         onOpenChange={handleModalOpenChange}
         onCreateProduct={onCreateProduct}

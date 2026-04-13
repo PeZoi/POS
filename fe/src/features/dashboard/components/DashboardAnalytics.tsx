@@ -28,6 +28,14 @@ import {
 import { trendModeLabel, trendRangeDescription } from '@/features/dashboard/utils/dashboardAggregations'
 import { formatVnd } from '@/features/orders/orderManagementUtils'
 
+const CHART_COLORS = {
+  revenue: 'var(--chart-1)',
+  orders: 'var(--chart-2)',
+  topProductRevenue: 'var(--chart-3)',
+  topCustomerRevenue: 'var(--chart-4)',
+  topProductQty: 'var(--chart-5)',
+} as const
+
 const tooltipProps = {
   contentStyle: {
     backgroundColor: 'var(--card)',
@@ -49,11 +57,12 @@ function RevenueAreaChart({ data, xTickAngle = 0 }: { data: DayBucketPoint[]; xT
       >
         <defs>
           <linearGradient id="dashRevenueFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+            <stop offset="5%" stopColor={CHART_COLORS.revenue} stopOpacity={0.42} />
+            <stop offset="60%" stopColor={CHART_COLORS.revenue} stopOpacity={0.12} />
+            <stop offset="95%" stopColor={CHART_COLORS.revenue} stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} vertical={false} />
         <XAxis
           dataKey="label"
           tick={axisTick}
@@ -73,6 +82,7 @@ function RevenueAreaChart({ data, xTickAngle = 0 }: { data: DayBucketPoint[]; xT
         />
         <Tooltip
           {...tooltipProps}
+          cursor={{ stroke: 'var(--border)', strokeOpacity: 0.6 }}
           formatter={(value: number) => [formatVnd(value), 'Doanh thu']}
           labelFormatter={(label) => String(label)}
         />
@@ -80,9 +90,11 @@ function RevenueAreaChart({ data, xTickAngle = 0 }: { data: DayBucketPoint[]; xT
           type="monotone"
           dataKey="revenue"
           name="Doanh thu"
-          stroke="var(--chart-1)"
+          stroke={CHART_COLORS.revenue}
           strokeWidth={2}
           fill="url(#dashRevenueFill)"
+          dot={false}
+          activeDot={{ r: 5, stroke: 'var(--card)', strokeWidth: 2, fill: CHART_COLORS.revenue }}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -96,7 +108,13 @@ function OrdersBarChart({ data, xTickAngle = 0 }: { data: DayBucketPoint[]; xTic
         data={data}
         margin={{ top: 8, right: 8, left: 0, bottom: xTickAngle ? 12 : 0 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <defs>
+          <linearGradient id="dashOrdersFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={CHART_COLORS.orders} stopOpacity={0.9} />
+            <stop offset="100%" stopColor={CHART_COLORS.orders} stopOpacity={0.55} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} vertical={false} />
         <XAxis
           dataKey="label"
           tick={axisTick}
@@ -116,10 +134,11 @@ function OrdersBarChart({ data, xTickAngle = 0 }: { data: DayBucketPoint[]; xTic
         />
         <Tooltip
           {...tooltipProps}
+          cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
           formatter={(value: number) => [value, 'Số đơn']}
           labelFormatter={(label) => String(label)}
         />
-        <Bar dataKey="orders" name="Số đơn" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="orders" name="Số đơn" fill="url(#dashOrdersFill)" radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -191,7 +210,14 @@ function TopProductsBar({ rows }: { rows: TopProductRow[] }) {
   return (
     <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 36 + 40)}>
       <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+        <defs>
+          <linearGradient id="dashTopProductRevenueFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={CHART_COLORS.topProductRevenue} stopOpacity={0.35} />
+            <stop offset="35%" stopColor={CHART_COLORS.topProductRevenue} stopOpacity={0.75} />
+            <stop offset="100%" stopColor={CHART_COLORS.topProductRevenue} stopOpacity={0.95} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.55} horizontal={false} />
         <XAxis
           type="number"
           tick={axisTick}
@@ -210,7 +236,7 @@ function TopProductsBar({ rows }: { rows: TopProductRow[] }) {
           axisLine={{ stroke: 'var(--border)' }}
         />
         <Tooltip {...tooltipProps} formatter={(value: number) => [formatVnd(value), 'Thành tiền']} />
-        <Bar dataKey="subtotal" name="Thành tiền" fill="var(--chart-3)" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="subtotal" name="Thành tiền" fill="url(#dashTopProductRevenueFill)" radius={[0, 6, 6, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -224,7 +250,14 @@ function TopCustomersBar({ rows }: { rows: TopCustomerRow[] }) {
   return (
     <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 36 + 40)}>
       <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+        <defs>
+          <linearGradient id="dashTopCustomerFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={CHART_COLORS.topCustomerRevenue} stopOpacity={0.35} />
+            <stop offset="35%" stopColor={CHART_COLORS.topCustomerRevenue} stopOpacity={0.75} />
+            <stop offset="100%" stopColor={CHART_COLORS.topCustomerRevenue} stopOpacity={0.95} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.55} horizontal={false} />
         <XAxis
           type="number"
           tick={axisTick}
@@ -243,7 +276,7 @@ function TopCustomersBar({ rows }: { rows: TopCustomerRow[] }) {
           axisLine={{ stroke: 'var(--border)' }}
         />
         <Tooltip {...tooltipProps} formatter={(value: number) => [formatVnd(value), 'Tổng mua']} />
-        <Bar dataKey="revenue" name="Tổng mua" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="revenue" name="Tổng mua" fill="url(#dashTopCustomerFill)" radius={[0, 6, 6, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )

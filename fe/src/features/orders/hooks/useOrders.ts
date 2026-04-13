@@ -5,7 +5,7 @@ import { orderService, type CreateOrderInput } from '@/services/orderService'
 
 export type OrdersPagingFilters = {
   q: string
-  status: import('@/types/pos').OrderStatus | 'ALL' | null
+  status: import('@/types/pos').OrderStatus | import('@/types/pos').OrderStatus[] | 'ALL' | null
   totalMin: number | null
   totalMax: number | null
   sortBy?: 'id' | 'totalAmount' | 'customerName' | 'createdAt'

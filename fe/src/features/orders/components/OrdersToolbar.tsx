@@ -12,13 +12,14 @@ import {
 } from '@/features/orders/components/OrderFiltersPanel'
 import { formatVndCompact, normalize, parseMoneyParam, statusLabel } from '@/features/orders/orderManagementUtils'
 
-function statusFromSearchParams(sp: URLSearchParams): OrderStatusFilter {
-  const s = (sp.get('status') ?? '').trim()
-  if (s === 'PENDING') return 'PENDING'
-  if (s === 'PARTIALLY_PAID') return 'PARTIALLY_PAID'
-  if (s === 'PAID') return 'PAID'
-  if (s === 'CANCELLED') return 'CANCELLED'
-  return 'ALL'
+function statusesFromSearchParams(sp: URLSearchParams): OrderStatusFilter[] {
+  const raw = sp.getAll('status').flatMap((v) => String(v).split(','))
+  const out: OrderStatusFilter[] = []
+  for (const r of raw) {
+    const s = String(r).trim()
+    if (s === 'PENDING' || s === 'PARTIALLY_PAID' || s === 'PAID' || s === 'CANCELLED') out.push(s)
+  }
+  return Array.from(new Set(out))
 }
 
 function sortFromSearchParams(sp: URLSearchParams): { sortBy: OrderSortBy; sortDir: OrderSortDir } {
@@ -36,9 +37,9 @@ function sortFromSearchParams(sp: URLSearchParams): { sortBy: OrderSortBy; sortD
   return { sortBy, sortDir }
 }
 
-function setStatusOnParams(p: URLSearchParams, status: OrderStatusFilter) {
-  if (!status || status === 'ALL') p.delete('status')
-  else p.set('status', status)
+function setStatusesOnParams(p: URLSearchParams, statuses: OrderStatusFilter[]) {
+  p.delete('status')
+  for (const s of statuses) p.append('status', s)
 }
 
 function setSortOnParams(p: URLSearchParams, sortBy: OrderSortBy, sortDir: OrderSortDir) {
@@ -61,7 +62,7 @@ export function OrdersToolbar({
   defaultOpenFilters?: boolean
 }) {
   const appliedQuery = React.useMemo(() => searchParams.get('q') ?? '', [searchParams])
-  const appliedStatus = React.useMemo(() => statusFromSearchParams(searchParams), [searchParams])
+  const appliedStatuses = React.useMemo(() => statusesFromSearchParams(searchParams), [searchParams])
   const appliedSort = React.useMemo(() => sortFromSearchParams(searchParams), [searchParams])
 
   const [filtersOpen, setFiltersOpen] = React.useState(defaultOpenFilters)
@@ -86,7 +87,7 @@ export function OrdersToolbar({
     return () => window.clearTimeout(t)
   }, [searchParams, searchText, setSearchParams])
 
-  const [draftStatus, setDraftStatus] = React.useState<OrderStatusFilter>(appliedStatus)
+  const [draftStatuses, setDraftStatuses] = React.useState<OrderStatusFilter[]>(appliedStatuses)
   const [draftSortBy, setDraftSortBy] = React.useState<OrderSortBy>(appliedSort.sortBy)
   const [draftSortDir, setDraftSortDir] = React.useState<OrderSortDir>(appliedSort.sortDir)
   const [totalMinDraft, setTotalMinDraft] = React.useState(() => searchParams.get('totalMin') ?? '')
@@ -96,7 +97,7 @@ export function OrdersToolbar({
   const [totalRangeError, setTotalRangeError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    setDraftStatus(appliedStatus)
+    setDraftStatuses(appliedStatuses)
     setDraftSortBy(appliedSort.sortBy)
     setDraftSortDir(appliedSort.sortDir)
     setTotalMinDraft(searchParams.get('totalMin') ?? '')
@@ -104,7 +105,7 @@ export function OrdersToolbar({
     setTotalMinError(null)
     setTotalMaxError(null)
     setTotalRangeError(null)
-  }, [appliedSort.sortBy, appliedSort.sortDir, appliedStatus, searchParams])
+  }, [appliedSort.sortBy, appliedSort.sortDir, appliedStatuses, searchParams])
 
   const validateTotalDraft = React.useCallback((): { ok: true; min: number | null; max: number | null } | { ok: false } => {
     setTotalMinError(null)
@@ -148,7 +149,7 @@ export function OrdersToolbar({
     const q = normalize(searchParams.get('q') ?? '')
     return (
       q.length > 0 ||
-      statusFromSearchParams(searchParams) !== 'ALL' ||
+      statusesFromSearchParams(searchParams).length > 0 ||
       parseMoneyParam(searchParams.get('totalMin')) != null ||
       parseMoneyParam(searchParams.get('totalMax')) != null ||
       (searchParams.get('sortBy') != null && searchParams.get('sortBy') !== 'id')
@@ -160,8 +161,11 @@ export function OrdersToolbar({
     const q = (searchParams.get('q') ?? '').trim()
     if (q) badges.push({ key: 'q', label: `Tìm: ${q}` })
 
-    const st = statusFromSearchParams(searchParams)
-    if (st !== 'ALL') badges.push({ key: 'status', label: `Trạng thái: ${statusLabel(st as OrderStatus)}` })
+    const sts = statusesFromSearchParams(searchParams)
+    if (sts.length > 0) {
+      const names = sts.map((s) => statusLabel(s as OrderStatus)).join(', ')
+      badges.push({ key: 'status', label: `Trạng thái: ${names}` })
+    }
 
     const min = parseMoneyParam(searchParams.get('totalMin'))
     const max = parseMoneyParam(searchParams.get('totalMax'))
@@ -208,7 +212,7 @@ export function OrdersToolbar({
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev)
-        setStatusOnParams(p, draftStatus)
+        setStatusesOnParams(p, draftStatuses)
         setSortOnParams(p, draftSortBy, draftSortDir)
         if (r.min != null) p.set('totalMin', String(r.min))
         else p.delete('totalMin')
@@ -218,7 +222,7 @@ export function OrdersToolbar({
       },
       { replace: true },
     )
-  }, [draftSortBy, draftSortDir, draftStatus, setSearchParams, validateTotalDraft])
+  }, [draftSortBy, draftSortDir, draftStatuses, setSearchParams, validateTotalDraft])
 
   return (
     <div className="grid gap-3">
@@ -258,8 +262,8 @@ export function OrdersToolbar({
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearFilters}
         onApply={applyFilters}
-        draftStatus={draftStatus}
-        onDraftStatusChange={setDraftStatus}
+        draftStatuses={draftStatuses}
+        onDraftStatusesChange={setDraftStatuses}
         draftSortBy={draftSortBy}
         onDraftSortByChange={setDraftSortBy}
         draftSortDir={draftSortDir}

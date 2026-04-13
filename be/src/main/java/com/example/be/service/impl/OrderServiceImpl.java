@@ -59,7 +59,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderResponse> search(String q, OrderStatus status, int limit) {
+    public List<OrderResponse> search(String q, List<OrderStatus> status, int limit) {
         String query = q == null ? "" : q.trim();
         Long id = null;
         Integer totalAmountEq = null;
@@ -79,7 +79,8 @@ public class OrderServiceImpl implements OrderService {
 
         int safeLimit = Math.max(1, Math.min(limit, 200));
         Pageable pageable = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "id"));
-        Slice<OrderEntity> slice = orderRepository.searchOrdersSlice(query, id, totalAmountEq, status, pageable);
+        List<OrderStatus> statuses = (status == null || status.isEmpty()) ? null : status;
+        Slice<OrderEntity> slice = orderRepository.searchOrdersSlice(query, id, totalAmountEq, statuses, pageable);
         List<OrderEntity> thin = slice.getContent();
         if (thin.isEmpty()) {
             return List.of();
@@ -94,7 +95,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Slice<OrderResponse> page(
             String q,
-            OrderStatus status,
+            List<OrderStatus> status,
             Integer totalMin,
             Integer totalMax,
             int page,
@@ -129,8 +130,9 @@ public class OrderServiceImpl implements OrderService {
         Sort effectiveSort = sort == null || sort.isUnsorted() ? Sort.by(Sort.Direction.DESC, "id") : sort;
         Pageable pageable = PageRequest.of(p, s, effectiveSort);
 
+        List<OrderStatus> statuses = (status == null || status.isEmpty()) ? null : status;
         Slice<OrderEntity> thinSlice = orderRepository.pageOrdersSlice(
-                query, id, totalAmountEq, status, min, max, pageable);
+                query, id, totalAmountEq, statuses, min, max, pageable);
         Map<Long, OrderEntity> byId = loadOrdersWithItemsByIds(
                 thinSlice.getContent().stream().map(OrderEntity::getId).toList());
         return thinSlice.map(o -> OrderMapper.toResponse(byId.get(o.getId())));

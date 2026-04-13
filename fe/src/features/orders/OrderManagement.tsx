@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Plus } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import type { Order } from '@/types/pos'
+import type { Order, OrderStatus } from '@/types/pos'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { orderService } from '@/services/orderService'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,15 @@ export function OrderManagement() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const appliedQuery = React.useMemo(() => searchParams.get('q') ?? '', [searchParams])
-  const appliedStatus = React.useMemo(() => (searchParams.get('status') ?? '').trim() || 'ALL', [searchParams])
+  const appliedStatuses = React.useMemo(() => {
+    const raw = searchParams.getAll('status').flatMap((v) => String(v).split(','))
+    const out: OrderStatus[] = []
+    for (const r of raw) {
+      const s = String(r).trim()
+      if (s === 'PENDING' || s === 'PARTIALLY_PAID' || s === 'PAID' || s === 'CANCELLED') out.push(s)
+    }
+    return Array.from(new Set(out))
+  }, [searchParams])
   const appliedSortBy = React.useMemo(() => (searchParams.get('sortBy') ?? 'id').trim(), [searchParams])
   const appliedSortDir = React.useMemo(() => (searchParams.get('sortDir') ?? 'desc').trim(), [searchParams])
   const appliedTotalMin = React.useMemo(() => {
@@ -44,13 +52,7 @@ export function OrderManagement() {
     loadMore,
   } = useOrders({
     q: appliedQuery,
-    status:
-      appliedStatus === 'PENDING' ||
-      appliedStatus === 'PARTIALLY_PAID' ||
-      appliedStatus === 'PAID' ||
-      appliedStatus === 'CANCELLED'
-        ? appliedStatus
-        : 'ALL',
+    status: appliedStatuses.length > 0 ? appliedStatuses : 'ALL',
     totalMin: appliedTotalMin,
     totalMax: appliedTotalMax,
     sortBy:

@@ -32,6 +32,45 @@ function useEscapeToClose(open: boolean, onOpenChange: (o: boolean) => void) {
   }, [open, onOpenChange])
 }
 
+/** Khớp lớp phủ với visual viewport (mobile: bàn phím / thanh địa chỉ) để tránh modal bị nhảy, lệch. */
+function useVisualViewportFrame(enabled: boolean) {
+  const [frame, setFrame] = React.useState<{
+    top: number
+    left: number
+    width: number
+    height: number
+  } | null>(null)
+
+  React.useLayoutEffect(() => {
+    if (!enabled) {
+      setFrame(null)
+      return
+    }
+    const vv = window.visualViewport
+    if (!vv) {
+      setFrame(null)
+      return
+    }
+    const sync = () => {
+      setFrame({
+        top: vv.offsetTop,
+        left: vv.offsetLeft,
+        width: vv.width,
+        height: vv.height,
+      })
+    }
+    sync()
+    vv.addEventListener('resize', sync)
+    vv.addEventListener('scroll', sync)
+    return () => {
+      vv.removeEventListener('resize', sync)
+      vv.removeEventListener('scroll', sync)
+    }
+  }, [enabled])
+
+  return frame
+}
+
 export function Modal({
   open,
   onOpenChange,
@@ -46,6 +85,8 @@ export function Modal({
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
 
+  const vvFrame = useVisualViewportFrame(open && mounted)
+
   const contentRef = React.useRef<HTMLDivElement | null>(null)
 
   const isOutsideContent = React.useCallback((target: EventTarget | null) => {
@@ -58,7 +99,17 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50"
+      className={cn('fixed z-50', !vvFrame && 'inset-0')}
+      style={
+        vvFrame
+          ? {
+              top: vvFrame.top,
+              left: vvFrame.left,
+              width: vvFrame.width,
+              height: vvFrame.height,
+            }
+          : undefined
+      }
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -78,7 +129,8 @@ export function Modal({
           ref={contentRef}
           className={cn(
             'w-full bg-background text-foreground shadow-xl border rounded-t-2xl sm:rounded-2xl',
-            'max-h-[85vh] overflow-auto',
+            // Không dùng vh thuần — tránh nhảy khi mobile đổi viewport; % khớp lớp vv
+            'max-h-[min(85%,85dvh,40rem)] overflow-y-auto overscroll-contain',
             sizeClass[size],
           )}
         >

@@ -31,16 +31,19 @@ export const orderService = {
     return apiRequest<Order[]>('/api/orders')
   },
   /** Tìm theo orderCode (contains) hoặc id (equals) (server). */
-  search(q: string, status?: OrderStatus | 'ALL', limit = 50): Promise<Order[]> {
+  search(q: string, status?: OrderStatus | OrderStatus[] | 'ALL', limit = 50): Promise<Order[]> {
     const params = new URLSearchParams()
     params.set('q', q.trim())
     params.set('limit', String(limit))
-    if (status && status !== 'ALL') params.set('status', status)
+    if (status && status !== 'ALL') {
+      if (Array.isArray(status)) status.forEach((s) => params.append('status', s))
+      else params.set('status', status)
+    }
     return apiRequest<Order[]>(`/api/orders/search?${params.toString()}`)
   },
   page(opts: {
     q?: string
-    status?: OrderStatus | 'ALL' | null
+    status?: OrderStatus | OrderStatus[] | 'ALL' | null
     totalMin?: number | null
     totalMax?: number | null
     sortBy?: 'id' | 'totalAmount' | 'customerName' | 'createdAt'
@@ -51,7 +54,10 @@ export const orderService = {
     const params = new URLSearchParams()
     const q = (opts.q ?? '').trim()
     if (q) params.set('q', q)
-    if (opts.status && opts.status !== 'ALL') params.set('status', opts.status)
+    if (opts.status && opts.status !== 'ALL') {
+      if (Array.isArray(opts.status)) opts.status.forEach((s) => params.append('status', s))
+      else params.set('status', opts.status)
+    }
     if (opts.totalMin != null) params.set('totalMin', String(opts.totalMin))
     if (opts.totalMax != null) params.set('totalMax', String(opts.totalMax))
     if (opts.sortBy) params.set('sortBy', opts.sortBy)

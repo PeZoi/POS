@@ -14,11 +14,11 @@ import java.util.List;
 public interface OrderService {
     List<OrderResponse> list();
 
-    List<OrderResponse> search(String q, OrderStatus status, int limit);
+    List<OrderResponse> search(String q, List<OrderStatus> status, int limit);
 
     Slice<OrderResponse> page(
             String q,
-            OrderStatus status,
+            List<OrderStatus> status,
             Integer totalMin,
             Integer totalMax,
             int page,

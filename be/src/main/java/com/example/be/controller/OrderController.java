@@ -38,7 +38,7 @@ public class OrderController {
     @Operation(summary = "Search orders", description = "Tìm theo mã hoá đơn (contains), id (số nguyên), tên khách (contains), tổng tiền (khớp đúng: số thuần hoặc dạng 50.000 / 50,000). Có thể lọc theo status.")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> search(
             @RequestParam(name = "q", required = false, defaultValue = "") String q,
-            @RequestParam(name = "status", required = false) OrderStatus status,
+            @RequestParam(name = "status", required = false) List<OrderStatus> status,
             @RequestParam(name = "limit", required = false, defaultValue = "50") int limit
     ) {
         return ResponseEntity.ok(ApiResponse.success(orderService.search(q, status, limit)));
@@ -48,7 +48,7 @@ public class OrderController {
     @Operation(summary = "Page orders", description = "Filter + paging (slice) for infinity scroll.")
     public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> page(
             @RequestParam(name = "q", required = false, defaultValue = "") String q,
-            @RequestParam(name = "status", required = false) OrderStatus status,
+            @RequestParam(name = "status", required = false) List<OrderStatus> status,
             @RequestParam(name = "totalMin", required = false) Integer totalMin,
             @RequestParam(name = "totalMax", required = false) Integer totalMax,
             @RequestParam(name = "sortBy", required = false, defaultValue = "id") String sortBy,

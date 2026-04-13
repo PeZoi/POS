@@ -24,7 +24,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
      */
     @Query("""
             select o from OrderEntity o
-            where (:status is null or o.status = :status)
+            where (:status is null or o.status in :status)
               and (
                     :q is null
                     or :q = ''
@@ -38,7 +38,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
             @Param("q") String q,
             @Param("id") Long id,
             @Param("totalAmountEq") Integer totalAmountEq,
-            @Param("status") OrderStatus status,
+            @Param("status") Collection<OrderStatus> status,
             Pageable pageable
     );
 
@@ -47,7 +47,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
      */
     @Query("""
             select o from OrderEntity o
-            where (:status is null or o.status = :status)
+            where (:status is null or o.status in :status)
               and (
                     :q is null
                     or :q = ''
@@ -63,7 +63,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
             @Param("q") String q,
             @Param("id") Long id,
             @Param("totalAmountEq") Integer totalAmountEq,
-            @Param("status") OrderStatus status,
+            @Param("status") Collection<OrderStatus> status,
             @Param("totalMin") Integer totalMin,
             @Param("totalMax") Integer totalMax,
             Pageable pageable

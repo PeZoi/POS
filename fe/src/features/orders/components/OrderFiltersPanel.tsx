@@ -4,7 +4,6 @@ import {
   CalendarClock,
   Filter,
   Hash,
-  Tag,
   User,
   Wallet,
   X,
@@ -29,6 +28,45 @@ import type { OrderStatus } from '@/types/pos'
 export type OrderStatusFilter = 'ALL' | OrderStatus
 export type OrderSortBy = 'id' | 'totalAmount' | 'customerName' | 'createdAt'
 export type OrderSortDir = 'asc' | 'desc'
+
+const STATUS_FILTER_STYLE: Record<
+  OrderStatusFilter,
+  { swatch: string; labelClass: string }
+> = {
+  ALL: {
+    swatch: 'bg-muted-foreground/40 ring-1 ring-border',
+    labelClass: 'text-foreground',
+  },
+  PENDING: {
+    swatch: 'bg-sky-500 dark:bg-sky-400',
+    labelClass: 'text-sky-800 dark:text-sky-200',
+  },
+  PARTIALLY_PAID: {
+    swatch: 'bg-amber-500 dark:bg-amber-400',
+    labelClass: 'text-amber-950 dark:text-amber-100',
+  },
+  PAID: {
+    swatch: 'bg-emerald-600 dark:bg-emerald-500',
+    labelClass: 'text-emerald-900 dark:text-emerald-100',
+  },
+  CANCELLED: {
+    swatch: 'bg-rose-500 dark:bg-rose-400',
+    labelClass: 'text-rose-950 dark:text-rose-100',
+  },
+}
+
+function StatusSelectOption({ value, label }: { value: OrderStatusFilter; label: string }) {
+  const style = STATUS_FILTER_STYLE[value]
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2.5">
+      <span
+        className={cn('size-2.5 shrink-0 rounded-full', style.swatch)}
+        aria-hidden
+      />
+      <span className={cn('truncate font-medium', style.labelClass)}>{label}</span>
+    </span>
+  )
+}
 
 export type OrderFiltersPanelProps = {
   open: boolean
@@ -92,16 +130,18 @@ export function OrderFiltersPanel({
   }, [draftSortDir])
 
   const statusDisplay = React.useMemo(() => {
-    if (draftStatus === 'ALL') return { Icon: Tag, label: 'Tất cả' }
-    if (draftStatus === 'PENDING') return { Icon: Tag, label: 'Chờ thanh toán' }
-    if (draftStatus === 'PARTIALLY_PAID') return { Icon: Tag, label: 'Thanh toán 1 phần' }
-    if (draftStatus === 'PAID') return { Icon: Tag, label: 'Đã thanh toán' }
-    return { Icon: Tag, label: 'Đã huỷ' }
+    if (draftStatus === 'ALL') return { label: 'Tất cả' as const, filter: 'ALL' as const }
+    if (draftStatus === 'PENDING') return { label: 'Chờ thanh toán' as const, filter: 'PENDING' as const }
+    if (draftStatus === 'PARTIALLY_PAID')
+      return { label: 'Thanh toán 1 phần' as const, filter: 'PARTIALLY_PAID' as const }
+    if (draftStatus === 'PAID') return { label: 'Đã thanh toán' as const, filter: 'PAID' as const }
+    return { label: 'Đã huỷ' as const, filter: 'CANCELLED' as const }
   }, [draftStatus])
+
+  const statusTriggerStyle = STATUS_FILTER_STYLE[statusDisplay.filter]
 
   const SortByIcon = sortByDisplay.Icon
   const SortDirIcon = sortDirDisplay.Icon
-  const StatusIcon = statusDisplay.Icon
 
   return (
     <Card className="overflow-hidden border-dashed">
@@ -217,42 +257,32 @@ export function OrderFiltersPanel({
           <Select value={draftStatus} onValueChange={(v) => onDraftStatusChange(v as OrderStatusFilter)}>
             <SelectTrigger className="h-10 w-full">
               <SelectValue>
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <StatusIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{statusDisplay.label}</span>
+                <span className="inline-flex min-w-0 items-center gap-2.5">
+                  <span
+                    className={cn('size-2.5 shrink-0 rounded-full', statusTriggerStyle.swatch)}
+                    aria-hidden
+                  />
+                  <span className={cn('truncate font-medium', statusTriggerStyle.labelClass)}>
+                    {statusDisplay.label}
+                  </span>
                 </span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Tất cả
-                </span>
+              <SelectItem value="ALL" textValue="Tất cả">
+                <StatusSelectOption value="ALL" label="Tất cả" />
               </SelectItem>
-              <SelectItem value="PENDING">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Chờ thanh toán
-                </span>
+              <SelectItem value="PENDING" textValue="Chờ thanh toán">
+                <StatusSelectOption value="PENDING" label="Chờ thanh toán" />
               </SelectItem>
-              <SelectItem value="PARTIALLY_PAID">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Thanh toán 1 phần
-                </span>
+              <SelectItem value="PARTIALLY_PAID" textValue="Thanh toán 1 phần">
+                <StatusSelectOption value="PARTIALLY_PAID" label="Thanh toán 1 phần" />
               </SelectItem>
-              <SelectItem value="PAID">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đã thanh toán
-                </span>
+              <SelectItem value="PAID" textValue="Đã thanh toán">
+                <StatusSelectOption value="PAID" label="Đã thanh toán" />
               </SelectItem>
-              <SelectItem value="CANCELLED">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đã huỷ
-                </span>
+              <SelectItem value="CANCELLED" textValue="Đã huỷ">
+                <StatusSelectOption value="CANCELLED" label="Đã huỷ" />
               </SelectItem>
             </SelectContent>
           </Select>

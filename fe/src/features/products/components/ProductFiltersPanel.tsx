@@ -26,6 +26,27 @@ import { digitsOnly, formatThousandsComma, stripLeadingZeros } from '@/utils/pri
 
 export type StatusFilter = 'ACTIVE' | 'DELETED'
 
+const PRODUCT_STATUS_FILTER_STYLE: Record<StatusFilter, { swatch: string; labelClass: string }> = {
+  ACTIVE: {
+    swatch: 'bg-emerald-600 dark:bg-emerald-500',
+    labelClass: 'text-emerald-900 dark:text-emerald-100',
+  },
+  DELETED: {
+    swatch: 'bg-rose-500 dark:bg-rose-400',
+    labelClass: 'text-rose-950 dark:text-rose-100',
+  },
+}
+
+function ProductStatusSelectOption({ value, label }: { value: StatusFilter; label: string }) {
+  const style = PRODUCT_STATUS_FILTER_STYLE[value]
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2.5">
+      <span className={cn('size-2.5 shrink-0 rounded-full', style.swatch)} aria-hidden />
+      <span className={cn('truncate font-medium', style.labelClass)}>{label}</span>
+    </span>
+  )
+}
+
 export type ProductFiltersPanelProps = {
   open: boolean
   onToggleOpen: () => void
@@ -89,13 +110,14 @@ export function ProductFiltersPanel({
 
   const statusDisplay = React.useMemo(() => {
     return draftStatus === 'DELETED'
-      ? { Icon: Tag, label: 'Đã xoá' }
-      : { Icon: Tag, label: 'Đang bán' }
+      ? { label: 'Đã xoá' as const, filter: 'DELETED' as const }
+      : { label: 'Đang bán' as const, filter: 'ACTIVE' as const }
   }, [draftStatus])
+
+  const statusTriggerStyle = PRODUCT_STATUS_FILTER_STYLE[statusDisplay.filter]
 
   const SortByIcon = sortByDisplay.Icon
   const SortDirIcon = sortDirDisplay.Icon
-  const StatusIcon = statusDisplay.Icon
 
   return (
     <Card className="overflow-hidden border-dashed">
@@ -215,24 +237,23 @@ export function ProductFiltersPanel({
           <Select value={draftStatus} onValueChange={(v) => onDraftStatusChange(v as StatusFilter)}>
             <SelectTrigger className="h-10 w-full">
               <SelectValue>
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <StatusIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{statusDisplay.label}</span>
+                <span className="inline-flex min-w-0 items-center gap-2.5">
+                  <span
+                    className={cn('size-2.5 shrink-0 rounded-full', statusTriggerStyle.swatch)}
+                    aria-hidden
+                  />
+                  <span className={cn('truncate font-medium', statusTriggerStyle.labelClass)}>
+                    {statusDisplay.label}
+                  </span>
                 </span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ACTIVE">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đang bán
-                </span>
+              <SelectItem value="ACTIVE" textValue="Đang bán">
+                <ProductStatusSelectOption value="ACTIVE" label="Đang bán" />
               </SelectItem>
-              <SelectItem value="DELETED">
-                <span className="inline-flex items-center gap-2">
-                  <Tag className="size-4 text-muted-foreground" aria-hidden />
-                  Đã xoá
-                </span>
+              <SelectItem value="DELETED" textValue="Đã xoá">
+                <ProductStatusSelectOption value="DELETED" label="Đã xoá" />
               </SelectItem>
             </SelectContent>
           </Select>

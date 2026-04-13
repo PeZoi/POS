@@ -154,7 +154,7 @@ function MultiStatusSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          'flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none',
+          'flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none text-start',
           'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
         )}
         onClick={() => setOpen((v) => !v)}

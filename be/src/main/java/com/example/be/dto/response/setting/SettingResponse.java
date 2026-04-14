@@ -11,6 +11,7 @@ public record SettingResponse(
         @Schema(example = "false") boolean enableCard,
         @Schema(example = "false") boolean enablePrint,
         @Schema(example = "false") boolean darkMode,
+        @Schema(description = "Scanbot license key (dùng ở frontend)", example = "YOUR_SCANBOT_LICENSE_KEY") String scanbotLicenseKey,
         @Schema(example = "true") boolean telegramEnabled,
         @Schema(example = "true") boolean backupEnabled,
         @Schema(example = "02:00") String backupTime,

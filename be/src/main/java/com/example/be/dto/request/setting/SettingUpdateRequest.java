@@ -11,6 +11,8 @@ public record SettingUpdateRequest(
         Boolean enableCard,
         Boolean enablePrint,
         Boolean darkMode,
+        @Schema(description = "Scanbot license key (dùng ở frontend)")
+        @Size(max = 4096) String scanbotLicenseKey,
         @Schema(description = "Bật/tắt gửi thông báo Telegram (cần cấu hình bot token + chat id trên server)")
         Boolean telegramEnabled,
         @Schema(description = "Bật/tắt backup SQL (mysqldump) mỗi ngày")

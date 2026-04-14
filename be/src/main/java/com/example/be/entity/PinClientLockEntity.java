@@ -27,6 +27,9 @@ public class PinClientLockEntity {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
+    @Column(name = "last_client_ip", length = 64)
+    private String lastClientIp;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

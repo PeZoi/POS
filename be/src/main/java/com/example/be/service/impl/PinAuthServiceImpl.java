@@ -56,6 +56,9 @@ public class PinAuthServiceImpl implements PinAuthService {
                     e.setFailedAttempts(0);
                     return e;
                 });
+        if (clientIp != null && !clientIp.isBlank()) {
+            lock.setLastClientIp(clientIp);
+        }
 
         LocalDateTime now = LocalDateTime.now();
 

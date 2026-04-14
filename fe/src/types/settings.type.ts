@@ -8,6 +8,7 @@ export type Setting = {
   enableCard: boolean
   enablePrint: boolean
   darkMode: boolean
+  scanbotLicenseKey: string
   telegramEnabled: boolean
   backupEnabled: boolean
   backupTime: string
@@ -20,6 +21,7 @@ export type SettingUpdatePayload = {
   enableCard?: boolean
   enablePrint?: boolean
   darkMode?: boolean
+  scanbotLicenseKey?: string
   telegramEnabled?: boolean
   backupEnabled?: boolean
   backupTime?: string

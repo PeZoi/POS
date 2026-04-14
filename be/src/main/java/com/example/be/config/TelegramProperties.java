@@ -24,6 +24,12 @@ public class TelegramProperties {
      */
     private String serviceName = "pos-api";
 
+    /**
+     * Secret cho webhook endpoint để nhận lệnh Telegram (đổi Scanbot key).
+     * Nếu để trống thì webhook controller sẽ từ chối request.
+     */
+    private String webhookSecret = "";
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -62,5 +68,13 @@ public class TelegramProperties {
 
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
     }
 }

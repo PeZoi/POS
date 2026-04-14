@@ -9,6 +9,7 @@ import com.example.be.exception.NotFoundException;
 import com.example.be.exception.UnauthorizedException;
 import com.example.be.repository.SettingRepository;
 import com.example.be.service.SettingService;
+import com.example.be.util.ScanbotLicenseKeyNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,10 @@ public class SettingServiceImpl implements SettingService {
         if (req.darkMode() != null) {
             e.setDarkMode(req.darkMode());
         }
+        if (req.scanbotLicenseKey() != null) {
+            // Chuyển toàn bộ normalize về BE (FE chỉ gửi raw key/snippet).
+            e.setScanbotLicenseKey(ScanbotLicenseKeyNormalizer.normalize(req.scanbotLicenseKey()));
+        }
         if (req.telegramEnabled() != null) {
             e.setTelegramEnabled(req.telegramEnabled());
         }
@@ -93,6 +98,7 @@ public class SettingServiceImpl implements SettingService {
                 Boolean.TRUE.equals(e.getEnableCard()),
                 Boolean.TRUE.equals(e.getEnablePrint()),
                 Boolean.TRUE.equals(e.getDarkMode()),
+                e.getScanbotLicenseKey(),
                 Boolean.TRUE.equals(e.getTelegramEnabled()),
                 Boolean.TRUE.equals(e.getBackupEnabled()),
                 e.getBackupTime(),

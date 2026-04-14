@@ -38,6 +38,13 @@ public class SettingEntity {
     @Column(name = "dark_mode", nullable = false)
     private Boolean darkMode = false;
 
+    /**
+     * Scanbot license key dùng cho frontend (Scanbot Web SDK).
+     * Lưu trong DB để có thể đổi qua Settings / Telegram mà không cần rebuild FE.
+     */
+    @Column(name = "scanbot_license_key", nullable = false, length = 4096)
+    private String scanbotLicenseKey = "";
+
     @Column(name = "telegram_enabled", nullable = false)
     private Boolean telegramEnabled = false;
 

@@ -7,6 +7,7 @@ import { stopAllVideoElementStreams } from '@/lib/camera-stream'
 import { playBeep, unlockAudio } from '@/lib/sound-beep'
 import { scanbotEnginePath } from '@/lib/scanbot-engine'
 import { cn } from '@/lib/utils'
+import { useSettingsStore } from '@/store/settingsStore'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ScanbotSDK from 'scanbot-web-sdk/ui'
@@ -14,9 +15,8 @@ import type { BarcodeScannerResultWithSize } from 'scanbot-web-sdk/@types/model/
 import type { BarcodeScannerViewConfiguration } from 'scanbot-web-sdk/@types/model/configuration/barcode-scanner-view-configuration'
 import type { IBarcodeScannerHandle } from 'scanbot-web-sdk/@types/interfaces/i-barcode-scanner-handle'
 
-function licenseKeyFromEnv(): string {
-  const k = import.meta.env.VITE_SCANBOT_LICENSE_KEY
-  return typeof k === 'string' ? k : ''
+function licenseKeyFromSettings(scanbotLicenseKey: unknown): string {
+  return typeof scanbotLicenseKey === 'string' ? scanbotLicenseKey.trim() : ''
 }
 
 function formatScanbotError(e: unknown): string {
@@ -48,6 +48,9 @@ export default function ScanbotBarcodeScanner({
 }) {
   const reactId = useId().replace(/:/g, '')
   const containerId = `scanbot-barcode-${reactId}`
+
+  const scanbotLicenseKey = useSettingsStore((s) => s.settings?.scanbotLicenseKey)
+  const licenseKey = licenseKeyFromSettings(scanbotLicenseKey)
 
   const [status, setStatus] = useState<'idle' | 'initializing' | 'running' | 'error'>('idle')
   const [hint, setHint] = useState<string | null>(null)
@@ -118,7 +121,7 @@ export default function ScanbotBarcodeScanner({
 
       try {
         const sdk = await ScanbotSDK.initialize({
-          licenseKey: licenseKeyFromEnv(),
+          licenseKey,
           enginePath: scanbotEnginePath(),
           verboseLogging: false,
         })
@@ -246,7 +249,7 @@ export default function ScanbotBarcodeScanner({
       const host = document.getElementById(containerId)
       if (host) stopAllVideoElementStreams(host)
     }
-  }, [containerId, reportInitFailed, settings])
+  }, [containerId, licenseKey, reportInitFailed, settings])
 
   const showError = status === 'error' && hint
   const showLoading = status === 'initializing'
@@ -284,11 +287,8 @@ export default function ScanbotBarcodeScanner({
               Bật âm / Test beep
             </button>
           </div>
-          {!licenseKeyFromEnv() && (
+          {!licenseKey && (
             <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-              Cần biến môi trường{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-[0.75rem]">VITE_SCANBOT_LICENSE_KEY</code>
-              .{' '}
               <a
                 className="underline underline-offset-2 hover:text-foreground"
                 href="https://docs.scanbot.io/trial/"

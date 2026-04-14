@@ -19,6 +19,9 @@ export function SettingsPage() {
 
   const [storeName, setStoreName] = React.useState('')
   const [darkMode, setDarkMode] = React.useState(false)
+  const [scanbotLicenseKey, setScanbotLicenseKey] = React.useState('')
+  const [scanbotKeyMode, setScanbotKeyMode] = React.useState<'key' | 'format'>('key')
+  const [scanbotKeySnippet, setScanbotKeySnippet] = React.useState('')
   const [telegramEnabled, setTelegramEnabled] = React.useState(false)
   const [backupEnabled, setBackupEnabled] = React.useState(false)
   const [backupTime, setBackupTime] = React.useState('02:00')
@@ -38,6 +41,8 @@ export function SettingsPage() {
     if (!settings) return
     setStoreName(settings.storeName)
     setDarkMode(settings.darkMode)
+    setScanbotLicenseKey(settings.scanbotLicenseKey ?? '')
+    setScanbotKeySnippet('')
     setTelegramEnabled(settings.telegramEnabled)
     setBackupEnabled(settings.backupEnabled)
     setBackupTime(settings.backupTime)
@@ -70,10 +75,13 @@ export function SettingsPage() {
     }
     setSavingOps(true)
     try {
+      const rawScanbot = scanbotKeyMode === 'format' ? scanbotKeySnippet : scanbotLicenseKey
       const next = await updateSettings({
         telegramEnabled,
         backupEnabled,
         backupTime,
+        // FE gửi raw; BE sẽ normalize/parse snippet để lưu DB
+        scanbotLicenseKey: rawScanbot,
       })
       setSettings(next)
       toast.success('Đã lưu cài đặt vận hành')
@@ -267,6 +275,70 @@ export function SettingsPage() {
             </CardContent>
           </Card>
             </div>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Scanbot</CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  Nhập license key để quét mã vạch bằng Scanbot Web SDK. Thay đổi có hiệu lực gần như ngay.
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScanbotKeyMode('key')}
+                    className={
+                      scanbotKeyMode === 'key'
+                        ? 'rounded-lg border bg-foreground px-3 py-1.5 text-xs font-medium text-background'
+                        : 'rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 hover:bg-muted/60'
+                    }
+                  >
+                    Nhập key (đã format)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScanbotKeyMode('format')}
+                    className={
+                      scanbotKeyMode === 'format'
+                        ? 'rounded-lg border bg-foreground px-3 py-1.5 text-xs font-medium text-background'
+                        : 'rounded-lg border bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground/80 hover:bg-muted/60'
+                    }
+                  >
+                    Dán snippet (LICENSE_KEY = "..." + ...)
+                  </button>
+                </div>
+
+                {scanbotKeyMode === 'key' ? (
+                  <>
+                    <Label htmlFor="scanbotLicenseKey">SCANBOT_LICENSE_KEY</Label>
+                    <Input
+                      id="scanbotLicenseKey"
+                      type="password"
+                      autoComplete="off"
+                      value={scanbotLicenseKey}
+                      onChange={(e) => setScanbotLicenseKey(e.target.value)}
+                      placeholder="Dán license key tại đây"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="scanbotKeySnippet">Snippet</Label>
+                    <textarea
+                      id="scanbotKeySnippet"
+                      value={scanbotKeySnippet}
+                      onChange={(e) => setScanbotKeySnippet(e.target.value)}
+                      placeholder={'LICENSE_KEY = "..." + "\\n...";'}
+                      className="min-h-28 w-full resize-y rounded-xl border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                      spellCheck={false}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Bạn có thể dán nguyên đoạn <code className="rounded bg-muted px-1">LICENSE_KEY = "..." + ...</code>. Máy chủ sẽ tự ghép chuỗi và chuẩn hoá trước khi lưu DB.
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex items-center justify-end">
               <Button type="submit" disabled={savingOps}>

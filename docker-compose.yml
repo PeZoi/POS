@@ -1,0 +1,55 @@
+services:
+  backend:
+    build: ./be
+    expose:
+      - "8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/pos?useSSL=false&serverTimezone=UTC}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-root}
+      POS_SESSION_SECRET: ${POS_SESSION_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      APP_ENV: production
+      POS_TELEGRAM_WEBHOOK_SECRET: ${POS_TELEGRAM_WEBHOOK_SECRET:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  scanner-py:
+    build: ./scanner-py
+    expose:
+      - "8765"
+    environment:
+      PY_BARCODE_PORT: "8765"
+      BARCODE_DECODE_WORKERS: ${BARCODE_DECODE_WORKERS:-}
+      STRICT_GTIN: ${STRICT_GTIN:-}
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - scanner-py
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    command: >
+      sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $$!;
+      done"
+
+volumes:
+  letsencrypt:
+  certbot-webroot:

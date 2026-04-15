@@ -242,6 +242,46 @@ function TopProductsBar({ rows }: { rows: TopProductRow[] }) {
   )
 }
 
+function TopProductsQtyBar({ rows }: { rows: TopProductRow[] }) {
+  const data = React.useMemo(
+    () => [...rows].reverse().map((r) => ({ ...r, label: r.name.length > 28 ? `${r.name.slice(0, 26)}…` : r.name })),
+    [rows],
+  )
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 36 + 40)}>
+      <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
+        <defs>
+          <linearGradient id="dashTopProductQtyFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={CHART_COLORS.topProductQty} stopOpacity={0.3} />
+            <stop offset="35%" stopColor={CHART_COLORS.topProductQty} stopOpacity={0.7} />
+            <stop offset="100%" stopColor={CHART_COLORS.topProductQty} stopOpacity={0.95} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.55} horizontal={false} />
+        <XAxis
+          type="number"
+          allowDecimals={false}
+          tick={axisTick}
+          tickLine={false}
+          axisLine={{ stroke: 'var(--border)' }}
+          height={48}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          type="category"
+          dataKey="label"
+          width={100}
+          tick={axisTick}
+          tickLine={false}
+          axisLine={{ stroke: 'var(--border)' }}
+        />
+        <Tooltip {...tooltipProps} formatter={(value: number) => [value, 'Số lượng']} />
+        <Bar dataKey="quantity" name="Số lượng" fill="url(#dashTopProductQtyFill)" radius={[0, 6, 6, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
 function TopCustomersBar({ rows }: { rows: TopCustomerRow[] }) {
   const data = React.useMemo(
     () => [...rows].reverse().map((r) => ({ ...r, label: r.name.length > 24 ? `${r.name.slice(0, 22)}…` : r.name })),
@@ -382,6 +422,20 @@ export function DashboardAnalytics({
             <div className="py-12 text-center text-sm text-muted-foreground">Chưa có dòng hàng trên đơn</div>
           ) : (
             <TopProductsBar rows={topProducts} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Top sản phẩm bán chạy</CardTitle>
+          <CardDescription>Trong kỳ đang chọn · đơn không huỷ · gộp theo tên sản phẩm</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {topProducts.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Chưa có dòng hàng trên đơn</div>
+          ) : (
+            <TopProductsQtyBar rows={topProducts} />
           )}
         </CardContent>
       </Card>

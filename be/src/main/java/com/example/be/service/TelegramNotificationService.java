@@ -86,14 +86,14 @@ public class TelegramNotificationService {
 
     public void notifyBackupSuccess(String absolutePath, long sizeBytes, String database) {
         String size = sizeBytes < 0 ? "?" : formatBytes(sizeBytes);
+        String env = safe(telegramProperties.getEnv(), "local").toUpperCase();
         StringBuilder sb = new StringBuilder();
-        sb.append("✅ [").append(safe(telegramProperties.getEnv(), "local").toUpperCase()).append("][BACKUP]\n");
-        sb.append("-----------------------------\n");
-        sb.append("MySQL dump thành công\n");
-        sb.append("🗄 DB: ").append(safe(database, "?")).append("\n");
-        sb.append("📁 File: ").append(safe(absolutePath, "")).append("\n");
-        sb.append("📦 Dung lượng: ").append(size).append("\n");
-        sb.append("⏰ ").append(LocalDateTime.now().format(TIME));
+        sb.append("✅ [").append(env).append("][BACKUP] ");
+        sb.append("MySQL dump thành công");
+        sb.append(" | 🗄 DB: ").append(safe(database, "?"));
+        sb.append(" | 📁 File: ").append(safe(absolutePath, ""));
+        sb.append(" | 📦 Dung lượng: ").append(size);
+        sb.append(" | ⏰ ").append(LocalDateTime.now().format(TIME));
         sendPlainTextAsync(sb.toString());
     }
 
@@ -125,12 +125,12 @@ public class TelegramNotificationService {
     }
 
     public void notifyBackupFailure(String detail) {
+        String env = safe(telegramProperties.getEnv(), "local").toUpperCase();
         StringBuilder sb = new StringBuilder();
-        sb.append("❌ [").append(safe(telegramProperties.getEnv(), "local").toUpperCase()).append("][BACKUP]\n");
-        sb.append("-----------------------------\n");
-        sb.append("MySQL dump thất bại\n");
-        sb.append("📢 ").append(truncate(safe(detail, "unknown"), 800)).append("\n");
-        sb.append("⏰ ").append(LocalDateTime.now().format(TIME));
+        sb.append("❌ [").append(env).append("][BACKUP] ");
+        sb.append("MySQL dump thất bại");
+        sb.append(" | 📢 ").append(truncate(safe(detail, "unknown"), 800));
+        sb.append(" | ⏰ ").append(LocalDateTime.now().format(TIME));
         sendPlainTextAsync(sb.toString());
     }
 

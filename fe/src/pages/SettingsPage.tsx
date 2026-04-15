@@ -279,9 +279,6 @@ export function SettingsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle>Scanbot</CardTitle>
-                <div className="text-xs text-muted-foreground">
-                  Nhập license key để quét mã vạch bằng Scanbot Web SDK. Thay đổi có hiệu lực gần như ngay.
-                </div>
               </CardHeader>
               <CardContent className="grid gap-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -332,9 +329,6 @@ export function SettingsPage() {
                       className="min-h-28 w-full resize-y rounded-xl border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                       spellCheck={false}
                     />
-                    <div className="text-xs text-muted-foreground">
-                      Bạn có thể dán nguyên đoạn <code className="rounded bg-muted px-1">LICENSE_KEY = "..." + ...</code>. Máy chủ sẽ tự ghép chuỗi và chuẩn hoá trước khi lưu DB.
-                    </div>
                   </>
                 )}
               </CardContent>

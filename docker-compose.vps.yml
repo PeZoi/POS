@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pos-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - /opt/docker-data/mysql:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    image: ${POS_BACKEND_IMAGE}:${POS_TAG}
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      POS_SESSION_SECRET: ${POS_SESSION_SECRET}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      APP_ENV: ${APP_ENV:-production}
+      POS_TELEGRAM_WEBHOOK_SECRET: ${POS_TELEGRAM_WEBHOOK_SECRET:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  scanner-py:
+    image: ${POS_SCANNER_IMAGE}:${POS_TAG}
+    restart: always
+    expose:
+      - "8765"
+    environment:
+      PY_BARCODE_PORT: "8765"
+      BARCODE_DECODE_WORKERS: ${BARCODE_DECODE_WORKERS:-}
+      STRICT_GTIN: ${STRICT_GTIN:-}
+
+  nginx:
+    image: ${POS_NGINX_IMAGE}:${POS_TAG}
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - scanner-py
+volumes: {}

@@ -84,23 +84,11 @@ public class TelegramNotificationService {
         sendPlainTextAsync(sb.toString());
     }
 
-    public void notifyBackupSuccess(String absolutePath, long sizeBytes, String database) {
-        String size = sizeBytes < 0 ? "?" : formatBytes(sizeBytes);
-        String env = safe(telegramProperties.getEnv(), "local").toUpperCase();
-        StringBuilder sb = new StringBuilder();
-        sb.append("✅ [").append(env).append("][BACKUP] ");
-        sb.append("MySQL dump thành công");
-        sb.append(" | 🗄 DB: ").append(safe(database, "?"));
-        sb.append(" | 📁 File: ").append(safe(absolutePath, ""));
-        sb.append(" | 📦 Dung lượng: ").append(size);
-        sb.append(" | ⏰ ").append(LocalDateTime.now().format(TIME));
-        sendPlainTextAsync(sb.toString());
-    }
-
     /**
-     * Gửi file dump lên Telegram (sendDocument). Nếu gửi thành công sẽ xoá file.
+     * Gửi một tin nhắn duy nhất: file dump + caption định dạng (không gửi thêm sendMessage).
+     * Nếu gửi thành công sẽ xoá file trên disk.
      */
-    public void sendDumpFileAndDeleteAsync(Path file, String caption) {
+    public void sendSqlBackupDumpAsync(Path file, String database, long sizeBytes, LocalDateTime backupTime) {
         if (!isTelegramEnabled()) {
             return;
         }
@@ -112,6 +100,11 @@ public class TelegramNotificationService {
         if (botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
             return;
         }
+        String fileName = file.getFileName() != null ? file.getFileName().toString() : file.toString();
+        String timeStr = backupTime != null ? backupTime.format(TIME) : LocalDateTime.now().format(TIME);
+        String sizeStr = sizeBytes < 0 ? "?" : formatBytes(sizeBytes);
+        String caption = buildSqlBackupCaption(safe(database, "?"), fileName, sizeStr, timeStr);
+
         CompletableFuture.runAsync(() -> {
             try {
                 boolean ok = postDocument(botToken, chatId, file, caption);
@@ -122,6 +115,17 @@ public class TelegramNotificationService {
                 log.warn("Gửi dump file qua Telegram thất bại: {}", e.getMessage());
             }
         });
+    }
+
+    private static String buildSqlBackupCaption(String database, String fileName, String sizeStr, String timeStr) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🗄️ SAO LƯU DATABASE\n");
+        sb.append("-----------------------------\n");
+        sb.append("🧩 Database: ").append(database).append("\n");
+        sb.append("📅 Thời gian: ").append(timeStr).append("\n");
+        sb.append("📁 File: ").append(fileName).append("\n");
+        sb.append("📦 Dung lượng: ").append(sizeStr).append("\n");
+        return sb.toString();
     }
 
     public void notifyBackupFailure(String detail) {
@@ -221,7 +225,7 @@ public class TelegramNotificationService {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("chat_id", chatId);
         if (caption != null && !caption.isBlank()) {
-            body.add("caption", truncate(caption.trim(), 900));
+            body.add("caption", truncate(caption.trim(), 1024));
         }
         body.add("document", new FileSystemResource(file.toFile()));
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { updateSettings } from '@/services/settingsService'
+import { backupSqlNow, updateSettings } from '@/services/settingsService'
 import { ApiError } from '@/services/apiClient'
 import { useSettingsStore } from '@/store/settingsStore'
 import { Separator } from '@/components/ui/separator'
@@ -32,6 +32,7 @@ export function SettingsPage() {
   const [saving, setSaving] = React.useState(false)
   const [savingPin, setSavingPin] = React.useState(false)
   const [savingOps, setSavingOps] = React.useState(false)
+  const [backupNowLoading, setBackupNowLoading] = React.useState(false)
 
   React.useEffect(() => {
     void loadFull()
@@ -120,6 +121,23 @@ export function SettingsPage() {
       toast.error(e instanceof ApiError ? e.message : 'Đổi PIN thất bại')
     } finally {
       setSavingPin(false)
+    }
+  }
+
+  const runBackupNow = async (): Promise<void> => {
+    setBackupNowLoading(true)
+    try {
+      const res = await backupSqlNow()
+      if (res.ok) {
+        toast.success(res.message || 'Backup thành công')
+      } else {
+        toast.error(res.message || 'Backup thất bại')
+      }
+      await loadFull()
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Backup thất bại')
+    } finally {
+      setBackupNowLoading(false)
     }
   }
 
@@ -271,6 +289,17 @@ export function SettingsPage() {
                     {settings.lastBackupAt ? new Date(settings.lastBackupAt).toLocaleString() : 'Chưa có'}
                   </span>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={backupNowLoading}
+                  onClick={() => void runBackupNow()}
+                >
+                  {backupNowLoading ? 'Đang backup…' : 'Backup ngay'}
+                </Button>
               </div>
             </CardContent>
           </Card>

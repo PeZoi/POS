@@ -25,6 +25,9 @@ services:
     expose:
       - "8080"
     environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      # Cùng network với mysql:3306 — dùng mariadb-dump (image đã cài mariadb-client). SSL dump: application.properties.
+      POS_MYSQLDUMP_CMD: mariadb-dump
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}

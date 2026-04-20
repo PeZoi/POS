@@ -9,7 +9,8 @@
 # Tuỳ chọn môi trường:
 #   BARCODE_DECODE_WORKERS=8   — số thread decode (mặc định max(4, cpu+2), tối đa 16).
 #   STRICT_GTIN=true             — chỉ trả mã số 8/12/13 nếu đúng checksum GS1.
-opencv-python-headless>=4.9.0
+# BarcodeDetector nằm trong OpenCV contrib; bản thường có thể thiếu/khó đạt tỉ lệ nhận diện.
+opencv-contrib-python-headless>=4.9.0
 numpy>=1.26.0
 websockets>=12.0
 pyzbar>=0.1.9

@@ -33,3 +33,11 @@ export type PinVerifyResult = {
   expiresAtEpochSeconds: number
   token: string
 }
+
+export type SqlBackupNowResult = {
+  ok: boolean
+  message: string
+  database: string | null
+  bytes: number
+  finishedAt: string | null
+}

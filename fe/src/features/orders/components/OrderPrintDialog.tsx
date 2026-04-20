@@ -40,6 +40,12 @@ function escapeHtml(input: string) {
     .replaceAll("'", '&#39;')
 }
 
+/** Safari iOS/iPadOS: `print()` phải chạy trong cùng user gesture; onload/setTimeout bị coi là in tự động và có thể bị chặn. */
+function needsSyncPrintForAppleTouch(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iP(hone|ad|od)/i.test(navigator.userAgent)
+}
+
 function statusLabel(status: OrderStatus | null) {
   if (status === 'PAID') return 'Đã thanh toán'
   if (status === 'PARTIALLY_PAID') return 'Thanh toán 1 phần'
@@ -188,6 +194,14 @@ export function OrderPrintDialog({ open, onOpenChange, order, remainingAmount }:
 
     @media print {
       a { color: inherit; text-decoration: none; }
+      /* Một số driver (HP) bỏ qua màu xám nhẹ — ép đen/trắng khi in cho ổn định */
+      html, body {
+        color: #000 !important;
+        background: #fff !important;
+      }
+      .muted, .totals .k, .sign .hint, .thanks { color: #000 !important; }
+      th { background: #eee !important; }
+      th, td { border-color: #000 !important; }
     }
   </style>
 </head>
@@ -274,13 +288,15 @@ export function OrderPrintDialog({ open, onOpenChange, order, remainingAmount }:
     const frame = document.createElement('iframe')
     frame.setAttribute('aria-hidden', 'true')
     frame.tabIndex = -1
+    // Không dùng width/height = 0 + opacity:0: một số driver HP raster theo khung iframe → giấy trắng,
+    // trong khi preview trong modal là DOM React (vẫn thấy chữ).
     frame.style.position = 'fixed'
-    frame.style.right = '0'
-    frame.style.bottom = '0'
-    frame.style.width = '0'
-    frame.style.height = '0'
+    frame.style.left = '-9999px'
+    frame.style.top = '0'
+    frame.style.width = '794px'
+    frame.style.height = '1123px'
     frame.style.border = '0'
-    frame.style.opacity = '0'
+    frame.style.pointerEvents = 'none'
     document.body.appendChild(frame)
 
     const win = frame.contentWindow
@@ -298,6 +314,15 @@ export function OrderPrintDialog({ open, onOpenChange, order, remainingAmount }:
       cleanupPrintFrame(frame)
     }
 
+    const scheduleIframeCleanup = () => {
+      const onAfterPrint = () => cleanupOnce()
+      win.addEventListener('afterprint', onAfterPrint, { once: true })
+      window.setTimeout(() => {
+        win.removeEventListener('afterprint', onAfterPrint)
+        cleanupOnce()
+      }, 8000)
+    }
+
     try {
       doc.open()
       doc.write(html)
@@ -308,19 +333,26 @@ export function OrderPrintDialog({ open, onOpenChange, order, remainingAmount }:
       return
     }
 
-    // Một số trình duyệt cần đợi layout xong mới in ổn định.
+    // Một số trình duyệt cần đợi layout xong mới in ổn định; tránh gọi print() hai lần (onload + timeout).
+    let printInvoked = false
     const doPrint = () => {
+      if (printInvoked) return
+      printInvoked = true
       try {
         win.focus()
         win.print()
       } finally {
-        window.setTimeout(cleanupOnce, 500)
+        scheduleIframeCleanup()
       }
     }
 
-    // Prefer onload; fallback timeout.
-    frame.onload = () => doPrint()
-    window.setTimeout(() => doPrint(), 250)
+    if (needsSyncPrintForAppleTouch()) {
+      // Cùng stack với click "In" — tránh popup "blocked from automatically printing" của Safari.
+      doPrint()
+    } else {
+      frame.onload = () => doPrint()
+      window.setTimeout(() => doPrint(), 250)
+    }
   }, [cleanupPrintFrame, order, printedAt])
 
   return (

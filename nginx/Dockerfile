@@ -1,8 +1,7 @@
-# syntax=docker/dockerfile:1
 FROM node:22-alpine AS fe-build
 WORKDIR /app
 COPY fe/package.json fe/package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 COPY fe/ ./
 RUN npm run build
 

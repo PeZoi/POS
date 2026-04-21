@@ -23,6 +23,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
   loadFull: async () => {
     const settings = await fetchSettings()
-    set({ settings, publicPreview: { storeName: settings.storeName } })
+    set({ settings, publicPreview: { storeName: settings.storeName, activeDomain: settings.activeDomain } })
   },
 }))

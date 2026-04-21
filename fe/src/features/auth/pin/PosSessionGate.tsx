@@ -45,6 +45,25 @@ export function PosSessionGate({ children }: PosSessionGateProps) {
   }, [tryResume])
 
   React.useEffect(() => {
+    // iOS Add-to-Home: luôn mở root domain trước (/?homescreen=1), sau khi load public settings thì mới redirect sang activeDomain.
+    const params = new URLSearchParams(window.location.search)
+    const isHomeScreen = params.get('homescreen') === '1' || params.get('homescreen') === 'true'
+    if (!isHomeScreen) return
+    const target = publicPreview?.activeDomain?.trim()
+    if (!target) return
+    const curHost = window.location.host.toLowerCase()
+    const targetHost = target.toLowerCase()
+    if (curHost === targetHost) return
+
+    // Delay nhẹ để UI kịp render (tránh cảm giác "bật icon là bay đi ngay")
+    const t = window.setTimeout(() => {
+      const next = `${window.location.protocol}//${targetHost}${window.location.pathname}${window.location.search}${window.location.hash}`
+      window.location.replace(next)
+    }, 900)
+    return () => window.clearTimeout(t)
+  }, [publicPreview?.activeDomain])
+
+  React.useEffect(() => {
     const onLost = () => {
       setPhase('locked')
     }

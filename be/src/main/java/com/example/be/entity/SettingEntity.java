@@ -60,6 +60,25 @@ public class SettingEntity {
     @Column(name = "last_backup_at")
     private LocalDateTime lastBackupAt;
 
+    // ===============================
+    // CLOUDFLARE DNS API
+    // ===============================
+    @Column(name = "cloudflare_api_token", nullable = false, length = 255)
+    private String cloudflareApiToken = "";
+
+    @Column(name = "cloudflare_zone_id", nullable = false, length = 64)
+    private String cloudflareZoneId = "";
+
+    @Column(name = "root_domain", nullable = false, length = 255)
+    private String rootDomain = "pos-toy.click";
+
+    /**
+     * Domain active hiện tại để root domain redirect sang (đổi URL trên thanh địa chỉ user).
+     * Ví dụ: a1.pos-toy.click
+     */
+    @Column(name = "active_domain", nullable = false, length = 255)
+    private String activeDomain = "";
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

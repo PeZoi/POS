@@ -19,8 +19,9 @@ public class SettingsBootstrap implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (settingRepository.findById(SettingEntity.SINGLETON_ID).isEmpty()) {
-            SettingEntity e = new SettingEntity();
+        SettingEntity e = settingRepository.findById(SettingEntity.SINGLETON_ID).orElse(null);
+        if (e == null) {
+            e = new SettingEntity();
             e.setId(SettingEntity.SINGLETON_ID);
             e.setStoreName("Cửa hàng");
             e.setPinHash(passwordEncoder.encode("1234"));
@@ -32,7 +33,22 @@ public class SettingsBootstrap implements ApplicationRunner {
             e.setTelegramEnabled(false);
             e.setBackupEnabled(false);
             e.setBackupTime("02:00");
-            settingRepository.save(e);
         }
+
+        // Backfill defaults cho hệ thống đang chạy (DB đã có row settings từ trước)
+        if (e.getCloudflareApiToken() == null) {
+            e.setCloudflareApiToken("");
+        }
+        if (e.getCloudflareZoneId() == null) {
+            e.setCloudflareZoneId("");
+        }
+        if (e.getRootDomain() == null || e.getRootDomain().isBlank()) {
+            e.setRootDomain("pos-toy.click");
+        }
+        if (e.getActiveDomain() == null) {
+            e.setActiveDomain("");
+        }
+
+        settingRepository.save(e);
     }
 }

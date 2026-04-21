@@ -8,6 +8,7 @@ import com.example.be.exception.BadRequestException;
 import com.example.be.exception.NotFoundException;
 import com.example.be.exception.UnauthorizedException;
 import com.example.be.repository.SettingRepository;
+import com.example.be.service.DnsProviderService;
 import com.example.be.service.SettingService;
 import com.example.be.util.ScanbotLicenseKeyNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +22,13 @@ public class SettingServiceImpl implements SettingService {
 
     private final SettingRepository settingRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DnsProviderService dnsProviderService;
 
     @Override
     @Transactional(readOnly = true)
     public SettingPublicResponse getPublic() {
         SettingEntity e = loadSingleton();
-        return new SettingPublicResponse(e.getStoreName());
+        return new SettingPublicResponse(e.getStoreName(), e.getActiveDomain());
     }
 
     @Override
@@ -39,6 +41,7 @@ public class SettingServiceImpl implements SettingService {
     @Transactional
     public SettingResponse update(SettingUpdateRequest req) {
         SettingEntity e = loadSingleton();
+        String prevActiveDomain = e.getActiveDomain() == null ? "" : e.getActiveDomain().trim();
 
         if (req.storeName() != null) {
             String name = req.storeName().trim();
@@ -72,6 +75,26 @@ public class SettingServiceImpl implements SettingService {
         if (req.backupTime() != null) {
             e.setBackupTime(req.backupTime());
         }
+        if (req.cloudflareApiToken() != null) {
+            e.setCloudflareApiToken(req.cloudflareApiToken().trim());
+        }
+        if (req.cloudflareZoneId() != null) {
+            e.setCloudflareZoneId(req.cloudflareZoneId().trim());
+        }
+        if (req.rootDomain() != null) {
+            String v = req.rootDomain().trim();
+            if (v.isEmpty()) {
+                throw new BadRequestException("rootDomain cannot be empty");
+            }
+            e.setRootDomain(v);
+        }
+        if (req.activeDomain() != null) {
+            String v = req.activeDomain().trim();
+            if (v.isEmpty()) {
+                throw new BadRequestException("activeDomain cannot be empty");
+            }
+            e.setActiveDomain(v);
+        }
 
         if (req.newPin() != null) {
             if (req.currentPin() == null) {
@@ -83,7 +106,15 @@ public class SettingServiceImpl implements SettingService {
             e.setPinHash(passwordEncoder.encode(req.newPin()));
         }
 
-        return toResponse(settingRepository.save(e));
+        SettingEntity saved = settingRepository.save(e);
+
+        // Nếu đổi activeDomain thì tự sync DNS record trùng tên (Cloudflare)
+        String nextActiveDomain = saved.getActiveDomain() == null ? "" : saved.getActiveDomain().trim();
+        if (req.activeDomain() != null && !prevActiveDomain.equalsIgnoreCase(nextActiveDomain)) {
+            dnsProviderService.syncActiveDomainDnsName(prevActiveDomain, nextActiveDomain);
+        }
+
+        return toResponse(saved);
     }
 
     private SettingEntity loadSingleton() {
@@ -102,7 +133,11 @@ public class SettingServiceImpl implements SettingService {
                 Boolean.TRUE.equals(e.getTelegramEnabled()),
                 Boolean.TRUE.equals(e.getBackupEnabled()),
                 e.getBackupTime(),
-                e.getLastBackupAt()
+                e.getLastBackupAt(),
+                e.getCloudflareApiToken(),
+                e.getCloudflareZoneId(),
+                e.getRootDomain(),
+                e.getActiveDomain()
         );
     }
 }

@@ -15,6 +15,10 @@ public record SettingResponse(
         @Schema(example = "true") boolean telegramEnabled,
         @Schema(example = "true") boolean backupEnabled,
         @Schema(example = "02:00") String backupTime,
-        LocalDateTime lastBackupAt
+        LocalDateTime lastBackupAt,
+        @Schema(description = "Cloudflare API Token (Bearer)") String cloudflareApiToken,
+        @Schema(description = "Cloudflare Zone ID") String cloudflareZoneId,
+        @Schema(description = "Root domain (dùng để nhận biết redirect)", example = "pos-toy.click") String rootDomain,
+        @Schema(description = "Domain active hiện tại (root domain redirect sang)", example = "a1.pos-toy.click") String activeDomain
 ) {
 }

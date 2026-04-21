@@ -11,6 +11,7 @@ import { backupSqlNow, updateSettings } from '@/services/settingsService'
 import { ApiError } from '@/services/apiClient'
 import { useSettingsStore } from '@/store/settingsStore'
 import { Separator } from '@/components/ui/separator'
+import { DomainSettingsSection } from '@/features/settings/components/DomainSettingsSection'
 
 export function SettingsPage() {
   const settings = useSettingsStore((s) => s.settings)
@@ -371,6 +372,15 @@ export function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <Separator />
+
+      <DomainSettingsSection
+        settings={settings}
+        onSettingsSaved={(next) => {
+          setSettings(next)
+        }}
+      />
 
       <Separator />
 

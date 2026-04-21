@@ -1,5 +1,6 @@
 export type SettingPublic = {
   storeName: string
+  activeDomain: string
 }
 
 export type Setting = {
@@ -13,6 +14,10 @@ export type Setting = {
   backupEnabled: boolean
   backupTime: string
   lastBackupAt: string | null
+  cloudflareApiToken: string
+  cloudflareZoneId: string
+  rootDomain: string
+  activeDomain: string
 }
 
 export type SettingUpdatePayload = {
@@ -25,6 +30,10 @@ export type SettingUpdatePayload = {
   telegramEnabled?: boolean
   backupEnabled?: boolean
   backupTime?: string
+  cloudflareApiToken?: string
+  cloudflareZoneId?: string
+  rootDomain?: string
+  activeDomain?: string
   currentPin?: string
   newPin?: string
 }

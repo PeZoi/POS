@@ -8,3 +8,9 @@ RUN npm run build
 FROM nginx:1.27-alpine
 COPY --from=fe-build /app/dist /usr/share/nginx/html
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+
+# Needed to fetch Cloudflare IP ranges at container start
+RUN apk add --no-cache curl
+
+# Auto-generate allowlist from Cloudflare IP ranges on startup
+COPY nginx/docker-entrypoint.d/10-cloudflare-ips.sh /docker-entrypoint.d/10-cloudflare-ips.sh

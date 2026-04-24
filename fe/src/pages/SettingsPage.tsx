@@ -142,6 +142,11 @@ export function SettingsPage() {
     }
   }
 
+  const openScanbotTrial = React.useCallback(() => {
+    window.open('https://docs.scanbot.io/trial/', '_blank', 'noopener,noreferrer')
+  }, [])
+
+
   if (!settings) {
     return (
       <div className="grid place-items-center py-16 text-sm text-muted-foreground">Đang tải cài đặt…</div>
@@ -175,7 +180,7 @@ export function SettingsPage() {
               void persistGeneral()
             }}
           >
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-2">
               <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
@@ -238,7 +243,7 @@ export function SettingsPage() {
               void persistOps()
             }}
           >
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-2">
               <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
@@ -365,6 +370,9 @@ export function SettingsPage() {
             </Card>
 
             <div className="flex items-center justify-end">
+              <Button type="button" variant="secondary" onClick={openScanbotTrial}>
+                Get license
+              </Button>
               <Button type="submit" disabled={savingOps}>
                 {savingOps ? 'Đang lưu…' : 'Lưu cấu hình'}
               </Button>
@@ -404,7 +412,7 @@ export function SettingsPage() {
               Mã PIN mở khoá
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
+          <CardContent className="grid gap-4 xl:grid-cols-3">
             <div className="grid gap-2">
               <Label htmlFor="currentPin">PIN hiện tại</Label>
               <Input
@@ -441,7 +449,7 @@ export function SettingsPage() {
                 placeholder="••••"
               />
             </div>
-            <div className="sm:col-span-3 flex justify-end">
+            <div className="xl:col-span-3 flex justify-end">
               <Button type="submit" disabled={savingPin}>
                 {savingPin ? 'Đang lưu…' : 'Đổi mã PIN'}
               </Button>

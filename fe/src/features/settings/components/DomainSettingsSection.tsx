@@ -225,8 +225,8 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
             void persist()
           }}
         >
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="lg:col-span-2 grid gap-1">
+          <div className="grid gap-3 xl:grid-cols-2">
+            <div className="xl:col-span-2 grid gap-1">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm font-medium">Cloudflare DNS</div>
                 <Badge variant="secondary">Khuyến nghị</Badge>
@@ -411,7 +411,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
           }
         >
           <div className="grid gap-4">
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-3">
               <div className="grid gap-2">
                 <Label>Loại</Label>
                 <Select value={editType} onValueChange={setEditType}>
@@ -452,7 +452,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-3">
               <div className="grid gap-2">
                 <Label>TTL</Label>
                 <Select value={String(editTtl)} onValueChange={(v) => setEditTtl(Number(v))}>
@@ -478,7 +478,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
                 <div className="text-xs text-muted-foreground">Thời gian sống — DNS resolver cache bản ghi này</div>
               </div>
 
-              <div className="grid gap-2 lg:col-span-2">
+              <div className="grid gap-2 xl:col-span-2">
                 <Label>Proxy qua One Shield</Label>
                 <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/10 px-3 py-3">
                   <div className="min-w-0">
@@ -525,7 +525,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
           }
         >
           <div className="grid gap-4">
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-3">
               <div className="grid gap-2">
                 <Label>Loại</Label>
                 <Select value={createType} onValueChange={setCreateType}>
@@ -566,7 +566,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-3">
               <div className="grid gap-2">
                 <Label>TTL</Label>
                 <Select value={String(createTtl)} onValueChange={(v) => setCreateTtl(Number(v))}>
@@ -592,7 +592,7 @@ export function DomainSettingsSection({ settings, onSettingsSaved }: Props) {
                 <div className="text-xs text-muted-foreground">Thời gian sống — DNS resolver cache bản ghi này</div>
               </div>
 
-              <div className="grid gap-2 lg:col-span-2">
+              <div className="grid gap-2 xl:col-span-2">
                 <Label>Proxy qua One Shield</Label>
                 <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/10 px-3 py-3">
                   <div className="min-w-0">
